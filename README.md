@@ -2,9 +2,28 @@
 
 Nukem RoastBot is an AI-powered Discord roast bot designed for adult friend groups, gaming communities, and social servers.
 
-The bot generates AI-powered roasts and presents manual roast responses through custom NukemLabs-branded image cards rather than standard Discord embeds.
+The bot generates personalized AI-powered roasts and presents manual roast responses through custom NukemLabs-branded image cards rather than standard Discord embeds.
 
 Developed by NukemLabs.
+
+---
+
+## Add Nukem RoastBot to Discord
+
+Install Nukem RoastBot directly to your Discord server:
+
+[Add Nukem RoastBot to Discord](https://discord.com/oauth2/authorize?client_id=1548537008085799012)
+
+The installer requests only the permissions needed for normal operation:
+
+- View Channels
+- Send Messages
+- Embed Links
+- Attach Files
+- Read Message History
+- Create application commands
+
+Administrator permission is not required.
 
 ---
 
@@ -144,6 +163,8 @@ Nukem-RoastBot/
 ├── card_maker.py
 ├── requirements.txt
 ├── README.md
+├── PRIVACY.md
+├── TERMS.md
 ├── LICENSE
 ├── .env.example
 ├── .gitignore
@@ -178,7 +199,7 @@ This directory should not be committed to Git.
 
 Python 3 is required.
 
-Install the project dependencies with:
+Install project dependencies with:
 
 ```bash
 pip install -r requirements.txt
@@ -212,7 +233,7 @@ The repository includes `.env.example` as a safe configuration reference.
 
 ## Running Locally
 
-Install the dependencies:
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
@@ -238,15 +259,38 @@ Store the bot token as:
 DISCORD_TOKEN
 ```
 
-The bot requires the Discord permissions necessary to:
+Recommended installation scopes:
 
-- View channels
-- Send messages
-- Attach files
-- Read message history
-- Use application commands
+```text
+applications.commands
+bot
+```
 
-Additional permissions may be required depending on the server configuration and how the bot is deployed.
+Recommended permissions:
+
+```text
+View Channels
+Send Messages
+Embed Links
+Attach Files
+Read Message History
+```
+
+Administrator permission is not required.
+
+### Gateway Intents
+
+The current bot configuration uses:
+
+```text
+Server Members Intent:  Enabled
+Message Content Intent: Enabled
+Presence Intent:        Disabled
+```
+
+Server Members Intent supports member-related features and automatic roasting.
+
+Message Content Intent is used for traditional prefix commands.
 
 ---
 
@@ -256,14 +300,16 @@ Nukem RoastBot is designed to run continuously on Railway.
 
 ### Required Variables
 
-Add the following environment variables to the Railway service:
+Add:
 
 ```text
 DISCORD_TOKEN
 GEMINI_API_KEY
 ```
 
-Do not place private API credentials directly in the source code.
+to the Railway service variables.
+
+Do not place private API credentials directly in source code.
 
 ---
 
@@ -276,7 +322,7 @@ For production use on Railway, attach a persistent volume so configuration survi
 Persistent data can include:
 
 - Selected automatic roast channel
-- Automatic roast enabled or disabled state
+- Automatic roasting enabled or disabled state
 - Roast interval
 - Roast probability
 - Member cooldown information
@@ -312,7 +358,7 @@ Deploy Latest Commit
 
 ## Running Multiple Bot Instances
 
-Do not run the local bot and the Railway production bot at the same time using the same Discord bot token.
+Do not run the local bot and Railway production bot at the same time using the same Discord bot token.
 
 Running multiple instances simultaneously can result in:
 
@@ -390,6 +436,26 @@ Never publicly share:
 - Private deployment credentials
 
 If a credential is accidentally exposed, rotate it immediately through the appropriate provider.
+
+---
+
+## Privacy
+
+Nukem RoastBot processes only the information reasonably necessary to provide its Discord functionality, server configuration, AI-generated responses, and roast cards.
+
+Full Privacy Policy:
+
+[Privacy Policy](https://github.com/NukemLabs/Nukem-RoastBot/blob/master/PRIVACY.md)
+
+---
+
+## Terms of Service
+
+Use of Nukem RoastBot is subject to the project's Terms of Service.
+
+Full Terms:
+
+[Terms of Service](https://github.com/NukemLabs/Nukem-RoastBot/blob/master/TERMS.md)
 
 ---
 
