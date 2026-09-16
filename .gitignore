@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 *.db
+generated_roasts/
+assets/roast_frame_backup.png
