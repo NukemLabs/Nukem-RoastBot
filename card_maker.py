@@ -1,34 +1,38 @@
 import os
 import re
-from pathlib import Path
 from datetime import datetime
 
 from PIL import (
     Image,
     ImageDraw,
     ImageFont,
-    ImageEnhance,
     ImageFilter,
+    ImageEnhance,
 )
 
 
 # ============================================================
 # NUKEM ROASTBOT
-# CLEAN / SHARP TEXT EDITION
+# DISCORD-SIZED / SHARP TEXT / FINAL LAYOUT
 # ============================================================
 
-BASE_DIR = Path(__file__).resolve().parent
-ASSETS_DIR = BASE_DIR / "assets"
-OUTPUT_DIR = BASE_DIR / "generated_roasts"
-
-FRAME_FILE = (
-    ASSETS_DIR
-    / "nukem_labs_industrial_overlay.png"
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
 )
 
-OUTPUT_DIR.mkdir(
-    parents=True,
-    exist_ok=True
+ASSETS_DIR = os.path.join(
+    BASE_DIR,
+    "assets"
+)
+
+OUTPUT_DIR = os.path.join(
+    BASE_DIR,
+    "generated_roasts"
+)
+
+FRAME_FILE = os.path.join(
+    ASSETS_DIR,
+    "nukem_labs_industrial_overlay.png"
 )
 
 
@@ -36,19 +40,21 @@ OUTPUT_DIR.mkdir(
 # OUTPUT SETTINGS
 # ============================================================
 
-# Smaller than the previous 1100px version.
-#
-# Discord shouldn't need to shrink this nearly as much,
-# which should help the lettering stay sharper.
-TARGET_WIDTH = 700
+TARGET_WIDTH = 560
 
-# Only NUKEM LABS animates.
-FRAME_COUNT = 12
+FRAME_COUNT = 8
 
-# About a 3.2 second loop.
-FRAME_DURATION_MS = 270
+FRAME_DURATIONS = [
+    500,
+    90,
+    90,
+    130,
+    650,
+    90,
+    120,
+    900,
+]
 
-# Maximum GIF palette.
 GIF_COLORS = 256
 
 
@@ -56,51 +62,64 @@ GIF_COLORS = 256
 # COLORS
 # ============================================================
 
-WHITE = (
-    248,
-    248,
-    248,
+USERNAME_COLOR = (
+    145,
+    155,
     255
 )
 
-MENTION_BLUE = (
-    150,
-    160,
-    255,
-    255
+BODY_COLOR = (
+    245,
+    245,
+    245
+)
+
+FOOTER_GRAY = (
+    180,
+    180,
+    180
 )
 
 NUKEM_YELLOW = (
     255,
-    211,
-    0,
-    255
-)
-
-MUTED_WHITE = (
-    190,
-    190,
-    190,
-    255
+    210,
+    0
 )
 
 TEXT_EDGE = (
     0,
     0,
-    0,
-    255
+    0
 )
 
 
 # ============================================================
-# FOOTER
+# DIRECTORY SETUP
 # ============================================================
 
-FOOTER_LEFT = "NukemLabs"
+def ensure_dirs():
 
-FOOTER_RIGHT = (
-    "•  We regret nothing."
-)
+    os.makedirs(
+        OUTPUT_DIR,
+        exist_ok=True
+    )
+
+
+# ============================================================
+# SAFE FILENAMES
+# ============================================================
+
+def safe_filename(text):
+
+    text = re.sub(
+        r"[^a-zA-Z0-9_-]+",
+        "_",
+        text
+    )
+
+    text = text.strip("_")
+
+    return text or "user"
 
 
 # ============================================================
@@ -121,6 +140,7 @@ def load_font(
             candidates.extend([
                 r"C:\Windows\Fonts\segoeuib.ttf",
                 r"C:\Windows\Fonts\arialbd.ttf",
+                r"C:\Windows\Fonts\verdanab.ttf",
                 r"C:\Windows\Fonts\bahnschrift.ttf",
             ])
 
@@ -129,6 +149,7 @@ def load_font(
             candidates.extend([
                 r"C:\Windows\Fonts\segoeui.ttf",
                 r"C:\Windows\Fonts\arial.ttf",
+                r"C:\Windows\Fonts\verdana.ttf",
                 r"C:\Windows\Fonts\bahnschrift.ttf",
             ])
 
@@ -163,40 +184,34 @@ def load_font(
 
                 pass
 
-    try:
-
-        return ImageFont.load_default(
-            size=size
-        )
-
-    except TypeError:
-
-        return ImageFont.load_default()
+    return ImageFont.load_default()
 
 
 # ============================================================
-# FILE HELPERS
+# TEXT MEASUREMENT
 # ============================================================
 
-def safe_filename(
-    text
+def text_size(
+    draw,
+    text,
+    font
 ):
 
-    text = re.sub(
-        r"[^a-zA-Z0-9_-]+",
-        "_",
-        text
+    bbox = draw.textbbox(
+        (0, 0),
+        text,
+        font=font,
+        stroke_width=1
     )
 
-    text = text.strip(
-        "_"
+    return (
+        bbox[2] - bbox[0],
+        bbox[3] - bbox[1]
     )
-
-    return text or "user"
 
 
 # ============================================================
-# CLEAN ROAST TEXT
+# CLEAN ROAST
 # ============================================================
 
 def clean_roast_for_card(
@@ -268,7 +283,6 @@ def clean_roast_for_card(
             (r"^runs\b", "You run"),
             (r"^tries\b", "You try"),
             (r"^keeps\b", "You keep"),
-            (r"^somehow\b", "You somehow"),
             (r"^could\b", "You could"),
             (r"^would\b", "You would"),
             (r"^will\b", "You will"),
@@ -318,7 +332,7 @@ def clean_roast_for_card(
 # WORD WRAPPING
 # ============================================================
 
-def wrap_text_by_pixels(
+def wrap_text(
     draw,
     text,
     font,
@@ -327,64 +341,150 @@ def wrap_text_by_pixels(
 
     words = text.split()
 
+    if not words:
+
+        return [""]
+
     lines = []
 
-    current_line = ""
+    current = words[0]
 
-    for word in words:
+    for word in words[1:]:
 
-        test_line = (
-            current_line
-            + (
-                " "
-                if current_line
-                else ""
-            )
+        test = (
+            current
+            + " "
             + word
         )
 
-        bbox = draw.textbbox(
-            (0, 0),
-            test_line,
-            font=font,
-            stroke_width=1
+        width, _ = text_size(
+            draw,
+            test,
+            font
         )
 
-        test_width = (
-            bbox[2]
-            - bbox[0]
-        )
+        if width <= max_width:
 
-        if test_width <= max_width:
-
-            current_line = test_line
+            current = test
 
         else:
 
-            if current_line:
+            lines.append(
+                current
+            )
 
-                lines.append(
-                    current_line
-                )
+            current = word
 
-            current_line = word
-
-    if current_line:
+    if current:
 
         lines.append(
-            current_line
+            current
         )
 
     return lines
 
 
 # ============================================================
-# LOAD ARTWORK AT FINAL SIZE
+# AUTOMATIC ROAST FONT FITTING
 # ============================================================
 
-def load_master_frame():
+def fit_roast_text(
+    draw,
+    text,
+    max_width,
+    max_height
+):
 
-    if not FRAME_FILE.exists():
+    for font_size in range(
+        15,
+        10,
+        -1
+    ):
+
+        font = load_font(
+            font_size,
+            bold=True
+        )
+
+        lines = wrap_text(
+            draw,
+            text,
+            font,
+            max_width
+        )
+
+        line_height = (
+            font_size
+            + 5
+        )
+
+        total_height = (
+            len(lines)
+            * line_height
+        )
+
+        if (
+            len(lines) <= 5
+            and
+            total_height <= max_height
+        ):
+
+            return (
+                font,
+                lines,
+                line_height
+            )
+
+    font = load_font(
+        10,
+        bold=True
+    )
+
+    lines = wrap_text(
+        draw,
+        text,
+        font,
+        max_width
+    )
+
+    return (
+        font,
+        lines[:5],
+        15
+    )
+
+
+# ============================================================
+# SHARP TEXT DRAWING
+# ============================================================
+
+def draw_sharp_text(
+    draw,
+    position,
+    text,
+    font,
+    fill
+):
+
+    draw.text(
+        position,
+        text,
+        font=font,
+        fill=fill,
+        stroke_width=1,
+        stroke_fill=TEXT_EDGE
+    )
+
+
+# ============================================================
+# BASE IMAGE
+# ============================================================
+
+def load_base_frame():
+
+    if not os.path.exists(
+        FRAME_FILE
+    ):
 
         raise FileNotFoundError(
             f"Missing asset:\n"
@@ -397,7 +497,7 @@ def load_master_frame():
         "RGBA"
     )
 
-    ratio = (
+    scale = (
         TARGET_WIDTH
         / base.width
     )
@@ -405,7 +505,7 @@ def load_master_frame():
     target_height = int(
         round(
             base.height
-            * ratio
+            * scale
         )
     )
 
@@ -417,12 +517,21 @@ def load_master_frame():
         Image.Resampling.LANCZOS
     )
 
+    base = (
+        ImageEnhance
+        .Sharpness(
+            base
+        )
+        .enhance(
+            1.08
+        )
+    )
+
     return base
 
 
 # ============================================================
-# ONLY ANIMATION:
-# NUKEM LABS SIGN FLICKER
+# NUKEM LABS FLICKER
 # ============================================================
 
 def add_nukem_labs_flicker(
@@ -455,28 +564,22 @@ def add_nukem_labs_flicker(
         bottom
     )
 
-    # Mostly static.
-    # Just two brief electrical flickers.
-    flicker_pattern = [
+    flicker_values = [
         1.00,
-        1.00,
-        1.00,
-        0.94,
+        0.93,
         1.07,
         1.01,
         1.00,
-        1.00,
-        0.97,
+        0.96,
         1.05,
-        1.00,
         1.00,
     ]
 
     brightness = (
-        flicker_pattern[
+        flicker_values[
             frame_index
             % len(
-                flicker_pattern
+                flicker_values
             )
         ]
     )
@@ -487,7 +590,7 @@ def add_nukem_labs_flicker(
         "RGBA"
     )
 
-    brightened = (
+    panel = (
         ImageEnhance
         .Brightness(
             panel
@@ -497,12 +600,7 @@ def add_nukem_labs_flicker(
         )
     )
 
-
-    # --------------------------------------------------------
-    # SOFT SIGN GLOW
-    # --------------------------------------------------------
-
-    grayscale = brightened.convert(
+    grayscale = panel.convert(
         "L"
     )
 
@@ -520,12 +618,12 @@ def add_nukem_labs_flicker(
     )
 
     glow_strength = int(
-        42
+        38
         + max(
             0,
             brightness - 1.0
         )
-        * 250
+        * 220
     )
 
     glow_alpha = glow_mask.point(
@@ -542,7 +640,7 @@ def add_nukem_labs_flicker(
 
     glow = Image.new(
         "RGBA",
-        brightened.size,
+        panel.size,
         (
             220,
             255,
@@ -557,7 +655,7 @@ def add_nukem_labs_flicker(
 
     result = Image.new(
         "RGBA",
-        brightened.size,
+        panel.size,
         (
             0,
             0,
@@ -573,7 +671,7 @@ def add_nukem_labs_flicker(
 
     result = Image.alpha_composite(
         result,
-        brightened
+        panel
     )
 
     frame.paste(
@@ -589,102 +687,81 @@ def add_nukem_labs_flicker(
 
 
 # ============================================================
-# SHARP STATIC TEXT
+# STATIC TEXT LAYER
 # ============================================================
 
-def add_roast_text(
-    frame,
+def make_text_layer(
+    size,
     username,
     roast_text
 ):
 
+    width, height = size
+
+    layer = Image.new(
+        "RGBA",
+        size,
+        (
+            0,
+            0,
+            0,
+            0
+        )
+    )
+
     draw = ImageDraw.Draw(
-        frame
-    )
-
-    width, height = frame.size
-
-
-    # --------------------------------------------------------
-    # FONT SIZES
-    #
-    # These are deliberately larger relative to the card
-    # than the previous version.
-    # --------------------------------------------------------
-
-    username_font_size = max(
-        17,
-        int(
-            width * 0.025
-        )
-    )
-
-    roast_font_size = max(
-        16,
-        int(
-            width * 0.023
-        )
-    )
-
-    footer_font_size = max(
-        10,
-        int(
-            width * 0.015
-        )
-    )
-
-
-    # Username stays bold.
-    username_font = load_font(
-        username_font_size,
-        bold=True
-    )
-
-    # BODY IS NOW BOLD.
-    #
-    # This is intentional.
-    # Thin font strokes are what suffer most when Discord
-    # shrinks the GIF.
-    roast_font = load_font(
-        roast_font_size,
-        bold=True
-    )
-
-    footer_bold_font = load_font(
-        footer_font_size,
-        bold=True
-    )
-
-    footer_font = load_font(
-        footer_font_size,
-        bold=False
+        layer
     )
 
 
     # --------------------------------------------------------
-    # TEXT AREA
+    # MAIN CONTENT AREA
     # --------------------------------------------------------
 
-    text_x = int(
+    text_left = int(
         width * 0.295
     )
 
-    username_y = int(
-        height * 0.292
-    )
-
-    roast_y = int(
-        height * 0.375
-    )
-
-    # Give the joke more horizontal room.
     text_right = int(
-        width * 0.750
+        width * 0.755
     )
+
+    username_y = int(
+        height * 0.300
+    )
+
+    body_top = int(
+        height * 0.390
+    )
+
+
+    # --------------------------------------------------------
+    # FINAL FOOTER POSITIONING
+    #
+    # These are deliberately higher than the previous
+    # version so they sit fully inside the black panel.
+    # --------------------------------------------------------
+
+    divider_y = int(
+        height * 0.685
+    )
+
+    footer_y = int(
+        height * 0.718
+    )
+
 
     max_text_width = (
         text_right
-        - text_x
+        - text_left
+    )
+
+    # Leave breathing room between final body line
+    # and the yellow divider.
+    max_body_height = (
+        divider_y
+        - body_top
+        - 10
     )
 
 
@@ -692,11 +769,14 @@ def add_roast_text(
     # USERNAME
     # --------------------------------------------------------
 
+    username_font = load_font(
+        16,
+        bold=True
+    )
+
     display_username = (
         username
-        if username.startswith(
-            "@"
-        )
+        if username.startswith("@")
         else "@"
         + username
     )
@@ -706,21 +786,15 @@ def add_roast_text(
         roast_text
     )
 
-    draw.text(
+    draw_sharp_text(
+        draw,
         (
-            text_x,
+            text_left,
             username_y
         ),
         display_username,
-        font=username_font,
-        fill=MENTION_BLUE,
-
-        # Tiny dark edge.
-        # This is NOT a glow.
-        # It keeps the lettering separated from the image
-        # when Discord scales it.
-        stroke_width=1,
-        stroke_fill=TEXT_EDGE
+        username_font,
+        USERNAME_COLOR
     )
 
 
@@ -728,50 +802,44 @@ def add_roast_text(
     # ROAST BODY
     # --------------------------------------------------------
 
-    wrapped_lines = wrap_text_by_pixels(
+    (
+        roast_font,
+        roast_lines,
+        line_height
+    ) = fit_roast_text(
         draw,
         roast_text,
-        roast_font,
-        max_text_width
+        max_text_width,
+        max_body_height
     )
 
-    current_y = roast_y
+    current_y = body_top
 
-    line_spacing = int(
-        roast_font_size
-        * 1.45
-    )
+    for line in roast_lines:
 
-    for line in wrapped_lines[:5]:
-
-        draw.text(
+        draw_sharp_text(
+            draw,
             (
-                text_x,
+                text_left,
                 current_y
             ),
             line,
-            font=roast_font,
-            fill=WHITE,
-            stroke_width=1,
-            stroke_fill=TEXT_EDGE
+            roast_font,
+            BODY_COLOR
         )
 
         current_y += (
-            line_spacing
+            line_height
         )
 
 
     # --------------------------------------------------------
-    # FOOTER DIVIDER
+    # DIVIDER
     # --------------------------------------------------------
-
-    divider_y = int(
-        height * 0.675
-    )
 
     draw.line(
         (
-            text_x,
+            text_left,
             divider_y,
             text_right,
             divider_y
@@ -785,59 +853,63 @@ def add_roast_text(
     # FOOTER
     # --------------------------------------------------------
 
-    footer_y = int(
-        height * 0.708
+    footer_bold_font = load_font(
+        9,
+        bold=True
+    )
+
+    footer_font = load_font(
+        9,
+        bold=False
     )
 
     draw.text(
         (
-            text_x,
+            text_left,
             footer_y
         ),
-        FOOTER_LEFT,
+        "NukemLabs",
         font=footer_bold_font,
         fill=NUKEM_YELLOW
     )
 
-    footer_left_box = draw.textbbox(
-        (
-            text_x,
-            footer_y
-        ),
-        FOOTER_LEFT,
-        font=footer_bold_font
-    )
-
-    footer_right_x = (
-        footer_left_box[2]
-        + int(
-            width * 0.012
-        )
+    nukem_width, _ = text_size(
+        draw,
+        "NukemLabs",
+        footer_bold_font
     )
 
     draw.text(
         (
-            footer_right_x,
+            text_left
+            + nukem_width
+            + 7,
             footer_y
         ),
-        FOOTER_RIGHT,
+        "•  We regret nothing.",
         font=footer_font,
-        fill=MUTED_WHITE
+        fill=FOOTER_GRAY
     )
 
-    return frame
+    return layer
 
 
 # ============================================================
 # BUILD FRAMES
 # ============================================================
 
-def make_card_frames(
+def build_frames(
     username,
     roast_text
 ):
 
-    base = load_master_frame()
+    base = load_base_frame()
+
+    text_layer = make_text_layer(
+        base.size,
+        username,
+        roast_text
+    )
 
     frames = []
 
@@ -847,25 +919,16 @@ def make_card_frames(
 
         frame = base.copy()
 
-
-        # ----------------------------------------------------
-        # ONLY ANIMATED ELEMENT
-        # ----------------------------------------------------
-
         frame = add_nukem_labs_flicker(
             frame,
             frame_index
         )
 
-
-        # ----------------------------------------------------
-        # DRAW TEXT LAST
-        # ----------------------------------------------------
-
-        frame = add_roast_text(
+        # Text goes on last.
+        # Nothing is resized afterward.
+        frame = Image.alpha_composite(
             frame,
-            username,
-            roast_text
+            text_layer
         )
 
         frames.append(
@@ -873,167 +936,6 @@ def make_card_frames(
         )
 
     return frames
-
-
-# ============================================================
-# BUILD SHARED GIF PALETTE
-# ============================================================
-
-def build_shared_palette(
-    frames
-):
-    """
-    Build one palette for the entire animation.
-
-    We also force the important text colors into the palette
-    so GIF quantization has less opportunity to muddy the
-    username, roast, divider, and footer.
-    """
-
-    sample_indexes = sorted({
-        0,
-        len(frames) // 3,
-        (
-            len(frames)
-            * 2
-        ) // 3,
-        len(frames) - 1,
-    })
-
-    width, height = (
-        frames[0].size
-    )
-
-    sample_width = max(
-        1,
-        width // 2
-    )
-
-    sample_height = max(
-        1,
-        height // 2
-    )
-
-    # Extra space for forced color swatches.
-    swatch_height = 40
-
-    palette_strip = Image.new(
-        "RGB",
-        (
-            sample_width,
-            (
-                sample_height
-                * len(
-                    sample_indexes
-                )
-            )
-            + swatch_height
-        ),
-        (
-            0,
-            0,
-            0
-        )
-    )
-
-    current_y = 0
-
-    for index in sample_indexes:
-
-        sample = (
-            frames[index]
-            .convert(
-                "RGB"
-            )
-            .resize(
-                (
-                    sample_width,
-                    sample_height
-                ),
-                Image.Resampling.LANCZOS
-            )
-        )
-
-        palette_strip.paste(
-            sample,
-            (
-                0,
-                current_y
-            )
-        )
-
-        current_y += (
-            sample_height
-        )
-
-
-    # --------------------------------------------------------
-    # FORCE IMPORTANT UI COLORS INTO PALETTE
-    # --------------------------------------------------------
-
-    swatch_draw = ImageDraw.Draw(
-        palette_strip
-    )
-
-    forced_colors = [
-        WHITE[:3],
-        MENTION_BLUE[:3],
-        NUKEM_YELLOW[:3],
-        MUTED_WHITE[:3],
-        TEXT_EDGE[:3],
-    ]
-
-    swatch_width = (
-        sample_width
-        // len(
-            forced_colors
-        )
-    )
-
-    for index, color in enumerate(
-        forced_colors
-    ):
-
-        x1 = (
-            index
-            * swatch_width
-        )
-
-        x2 = (
-            sample_width
-            if index
-            == len(
-                forced_colors
-            ) - 1
-            else (
-                x1
-                + swatch_width
-            )
-        )
-
-        swatch_draw.rectangle(
-            (
-                x1,
-                current_y,
-                x2,
-                current_y
-                + swatch_height
-            ),
-            fill=color
-        )
-
-
-    # --------------------------------------------------------
-    # CREATE 256-COLOR MASTER PALETTE
-    # --------------------------------------------------------
-
-    palette = palette_strip.quantize(
-        colors=GIF_COLORS,
-        method=Image.Quantize.MEDIANCUT,
-        dither=Image.Dither.NONE
-    )
-
-    return palette
 
 
 # ============================================================
@@ -1045,55 +947,60 @@ def save_gif(
     username
 ):
 
+    ensure_dirs()
+
     timestamp = datetime.now().strftime(
-        "%Y%m%d_%H%M%S_%f"
+        "%Y%m%d_%H%M%S"
     )
 
-    name_part = safe_filename(
+    clean_name = safe_filename(
         username.replace(
             "@",
             ""
         )
     )
 
-    output_path = (
-        OUTPUT_DIR
-        / (
+    output_path = os.path.join(
+        OUTPUT_DIR,
+        (
             f"roast_"
-            f"{name_part}_"
+            f"{clean_name}_"
             f"{timestamp}.gif"
         )
     )
 
 
     # --------------------------------------------------------
-    # ONE PALETTE FOR EVERY FRAME
+    # MASTER PALETTE
     # --------------------------------------------------------
 
-    shared_palette = build_shared_palette(
-        frames
+    first_rgb = frames[0].convert(
+        "RGB"
     )
 
+    first_paletted = first_rgb.quantize(
+        colors=GIF_COLORS,
+        method=Image.Quantize.MEDIANCUT,
+        dither=Image.Dither.NONE
+    )
+
+    gif_frames = [
+        first_paletted
+    ]
+
 
     # --------------------------------------------------------
-    # CONVERT FRAMES
-    #
-    # Dithering stays OFF.
-    #
-    # Dithering can be great for photographs, but around
-    # small typography it can look like fuzzy pixels.
+    # REMAINING FRAMES
     # --------------------------------------------------------
 
-    gif_frames = []
-
-    for frame in frames:
+    for frame in frames[1:]:
 
         rgb_frame = frame.convert(
             "RGB"
         )
 
         paletted_frame = rgb_frame.quantize(
-            palette=shared_palette,
+            palette=first_paletted,
             dither=Image.Dither.NONE
         )
 
@@ -1103,24 +1010,24 @@ def save_gif(
 
 
     # --------------------------------------------------------
-    # SAVE
+    # SAVE ANIMATION
     # --------------------------------------------------------
 
     gif_frames[0].save(
         output_path,
         save_all=True,
         append_images=gif_frames[1:],
-        duration=FRAME_DURATION_MS,
+        duration=FRAME_DURATIONS,
         loop=0,
         disposal=1,
-        optimize=True
+        optimize=False
     )
 
     return output_path
 
 
 # ============================================================
-# PUBLIC BOT FUNCTION
+# PUBLIC FUNCTION FOR BOT.PY
 # ============================================================
 
 def create_roast_card(
@@ -1128,7 +1035,7 @@ def create_roast_card(
     roast_text
 ):
 
-    frames = make_card_frames(
+    frames = build_frames(
         username,
         roast_text
     )
@@ -1154,19 +1061,26 @@ make_roast_card = (
 
 if __name__ == "__main__":
 
-    test_file = create_roast_card(
-        "@DudeNukem",
-        (
-            "DudeNukem is the kind of guy who could "
-            "get lost in a fucking revolving door and "
-            "still blame the building."
-        )
+    test_username = (
+        "@DudeNukem"
+    )
+
+    test_roast = (
+        "DudeNukem carries the frantic, disheveled "
+        "energy of a man trying to explain quantum "
+        "physics to a toaster while actively forgetting "
+        "how to fucking breathe."
+    )
+
+    result = create_roast_card(
+        test_username,
+        test_roast
     )
 
     file_size_mb = (
-        Path(
-            test_file
-        ).stat().st_size
+        os.path.getsize(
+            result
+        )
         / (
             1024
             * 1024
@@ -1176,23 +1090,24 @@ if __name__ == "__main__":
     print()
 
     print(
-        "SHARP TEXT NUKEM ROAST CARD COMPLETE"
+        "FINAL NUKEM ROAST CARD CREATED"
     )
 
     print(
-        "-------------------------------------"
+        "------------------------------"
     )
 
     print(
-        f"Created: {test_file}"
+        result
     )
 
     print(
-        f"Output width: {TARGET_WIDTH}px"
+        f"Width: {TARGET_WIDTH}px"
     )
 
     print(
-        f"File size: {file_size_mb:.2f} MB"
+        f"File size: "
+        f"{file_size_mb:.2f} MB"
     )
 
     print()
