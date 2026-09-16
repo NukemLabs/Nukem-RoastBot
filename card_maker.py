@@ -14,8 +14,7 @@ from PIL import (
 # NUKEM ROASTBOT
 # HIGH-DPI PRODUCTION EDITION
 #
-# IMPORTANT:
-# This version includes a scalable font fallback for Railway.
+# FINAL CARD DESIGN
 # ============================================================
 
 BASE_DIR = os.path.dirname(
@@ -42,8 +41,8 @@ FRAME_FILE = os.path.join(
 # HIGH-DPI OUTPUT
 # ============================================================
 
-# Discord displays this around half size.
-# 1040px source = roughly 520px visual footprint.
+# Discord displays this at roughly half size.
+# 1040px source = approximately 520px visual footprint.
 TARGET_WIDTH = 1040
 
 
@@ -107,15 +106,6 @@ def safe_filename(text):
 
 # ============================================================
 # FONT LOADING
-#
-# THIS IS THE IMPORTANT FIX.
-#
-# Locally Windows supplies Arial/Segoe UI.
-# Railway may not have those fonts.
-#
-# We try several Linux fonts and generic DejaVu names.
-# If NONE exist, Pillow's built-in scalable font is loaded
-# AT THE REQUESTED SIZE instead of the old tiny default.
 # ============================================================
 
 def load_font(
@@ -203,17 +193,7 @@ def load_font(
 
 
     # --------------------------------------------------------
-    # CRITICAL RAILWAY FALLBACK
-    #
-    # Newer Pillow versions support a scalable built-in font.
-    #
-    # The OLD code used:
-    #
-    #     ImageFont.load_default()
-    #
-    # which produced tiny text on Railway.
-    #
-    # We explicitly pass the requested SIZE here.
+    # SCALABLE PILLOW FALLBACK
     # --------------------------------------------------------
 
     try:
@@ -223,10 +203,6 @@ def load_font(
         )
 
     except TypeError:
-
-        # Extremely old Pillow fallback.
-        # Railway should never reach this with our current
-        # requirements, but it prevents a crash.
 
         return ImageFont.load_default()
 
@@ -446,14 +422,12 @@ def fit_roast_text(
     max_height
 ):
 
-    # At approximately 50% Discord display size:
+    # Approximately at Discord display size:
     #
-    # 36px -> ~18px visual
-    # 34px -> ~17px visual
-    # 32px -> ~16px visual
-    # 30px -> ~15px visual
-    #
-    # We do not allow microscopic text anymore.
+    # 36px -> ~18px
+    # 34px -> ~17px
+    # 32px -> ~16px
+    # 30px -> ~15px
 
     for font_size in [
         36,
@@ -655,7 +629,7 @@ def add_roast_content(
 
 
     # ========================================================
-    # LAYOUT
+    # FINAL LAYOUT
     # ========================================================
 
     text_left = int(
@@ -663,8 +637,18 @@ def add_roast_content(
     )
 
 
+    # FINAL POLISH:
+    #
+    # Previous production version:
+    #     0.800
+    #
+    # Final version:
+    #     0.815
+    #
+    # This adds roughly 3% more usable line width without
+    # changing any typography or vertical positioning.
     text_right = int(
-        width * 0.800
+        width * 0.815
     )
 
 
@@ -733,9 +717,6 @@ def add_roast_content(
         display_username,
         font=username_font,
         fill=USERNAME_COLOR,
-
-        # Same-color stroke slightly reinforces edges if
-        # Railway must use Pillow's fallback font.
         stroke_width=1,
         stroke_fill=USERNAME_COLOR
     )
@@ -771,9 +752,6 @@ def add_roast_content(
             line,
             font=roast_font,
             fill=BODY_COLOR,
-
-            # Same color means this thickens rather than
-            # creating a shadow/outline.
             stroke_width=1,
             stroke_fill=BODY_COLOR
         )
@@ -972,11 +950,11 @@ if __name__ == "__main__":
     print()
 
     print(
-        "NUKEM ROASTBOT PRODUCTION CARD CREATED"
+        "FINAL NUKEM ROASTBOT CARD CREATED"
     )
 
     print(
-        "--------------------------------------"
+        "---------------------------------"
     )
 
     print(
