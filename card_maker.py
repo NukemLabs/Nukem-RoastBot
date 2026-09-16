@@ -12,9 +12,12 @@ from PIL import (
 
 # ============================================================
 # NUKEM ROASTBOT
-# HIGH-DPI PRODUCTION CARD
+# FINAL HIGH-DPI PRODUCTION CARD
 #
-# FINAL SAFE-BOUNDS EDITION
+# No footer text.
+# Safe text bounds.
+# Railway-safe fonts.
+# Lossless PNG output.
 # ============================================================
 
 BASE_DIR = os.path.dirname(
@@ -68,12 +71,6 @@ NUKEM_YELLOW = (
     0
 )
 
-FOOTER_GRAY = (
-    205,
-    205,
-    205
-)
-
 
 # ============================================================
 # DIRECTORY SETUP
@@ -107,10 +104,7 @@ def safe_filename(text):
 # ============================================================
 # FONT LOADING
 #
-# Works on:
-# - Windows
-# - Railway / Linux
-# - Pillow scalable fallback
+# Works locally on Windows and on Railway/Linux.
 # ============================================================
 
 def load_font(
@@ -180,7 +174,7 @@ def load_font(
 
 
     # --------------------------------------------------------
-    # TRY REAL TTF FONT
+    # TRY REAL TTF FONTS
     # --------------------------------------------------------
 
     for font_path in candidates:
@@ -581,9 +575,7 @@ def trim_text_to_fit(
 
 
 # ============================================================
-# BULLETPROOF AUTO-FIT
-#
-# This guarantees the roast stays inside the safe area.
+# SAFE AUTO-FIT
 # ============================================================
 
 def fit_roast_text(
@@ -654,8 +646,6 @@ def fit_roast_text(
 
     # --------------------------------------------------------
     # EXTREME LONG-ROAST FALLBACK
-    #
-    # Never leave the box.
     # --------------------------------------------------------
 
     font = load_font(
@@ -765,8 +755,6 @@ def add_roast_content(
 
     # ========================================================
     # SAFE CONTENT AREA
-    #
-    # These bounds deliberately stop BEFORE the green frame.
     # ========================================================
 
     text_left = int(
@@ -774,9 +762,6 @@ def add_roast_content(
     )
 
 
-    # Pulled back slightly from the previous version.
-    #
-    # This guarantees text stays inside the black panel.
     text_right = int(
         width * 0.775
     )
@@ -792,13 +777,11 @@ def add_roast_content(
     )
 
 
+    # We no longer need to reserve room for footer text.
+    #
+    # This lets the roast use a little more vertical space.
     divider_y = int(
-        height * 0.700
-    )
-
-
-    footer_y = int(
-        height * 0.725
+        height * 0.735
     )
 
 
@@ -808,7 +791,6 @@ def add_roast_content(
     )
 
 
-    # Extra safety gap above divider.
     max_body_height = (
         divider_y
         - body_top
@@ -898,7 +880,11 @@ def add_roast_content(
 
 
     # ========================================================
-    # DIVIDER
+    # CLEAN BOTTOM ACCENT
+    #
+    # No NukemLabs footer.
+    # No slogan.
+    # No bullet/icon.
     # ========================================================
 
     draw.line(
@@ -910,58 +896,6 @@ def add_roast_content(
         ),
         fill=NUKEM_YELLOW,
         width=4
-    )
-
-
-    # ========================================================
-    # FOOTER
-    # ========================================================
-
-    footer_brand_font = load_font(
-        18,
-        bold=True
-    )
-
-
-    footer_font = load_font(
-        17,
-        bold=False
-    )
-
-
-    brand_text = (
-        "NukemLabs"
-    )
-
-
-    draw.text(
-        (
-            text_left,
-            footer_y
-        ),
-        brand_text,
-        font=footer_brand_font,
-        fill=NUKEM_YELLOW
-    )
-
-
-    brand_width = text_width(
-        draw,
-        brand_text,
-        footer_brand_font
-    )
-
-
-    draw.text(
-        (
-            text_left
-            + brand_width
-            + 14,
-            footer_y
-        ),
-        "•  We regret nothing.",
-        font=footer_font,
-        fill=FOOTER_GRAY
     )
 
 
@@ -1059,14 +993,11 @@ if __name__ == "__main__":
     )
 
 
-    # Deliberately long test roast so we can prove the
-    # auto-fit system keeps everything inside the panel.
     test_roast = (
         "DudeNukem carries the frantic energy of a man "
         "trying to explain the history of the universe "
         "to a brick wall while somehow remaining entirely "
-        "convinced he's the smartest bastard in the room "
-        "despite all available evidence suggesting otherwise."
+        "convinced he's the smartest bastard in the room."
     )
 
 
@@ -1087,11 +1018,11 @@ if __name__ == "__main__":
     print()
 
     print(
-        "FINAL SAFE-BOUNDS ROAST CARD CREATED"
+        "FINAL NUKEM ROASTBOT CARD CREATED"
     )
 
     print(
-        "------------------------------------"
+        "---------------------------------"
     )
 
     print(
