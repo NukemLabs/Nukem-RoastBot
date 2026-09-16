@@ -1,828 +1,218 @@
-import os
-import re
+from pathlib import Path
 from datetime import datetime
+from PIL import Image, ImageDraw, ImageFont
+import re
 
-from PIL import (
-    Image,
-    ImageDraw,
-    ImageFont,
-    ImageEnhance,
-)
+PROJECT_ROOT = Path(__file__).resolve().parent
+ASSETS_DIR = PROJECT_ROOT / "assets"
+OUTPUT_DIR = PROJECT_ROOT / "generated_roasts"
+FRAME_FILE = ASSETS_DIR / "roast_frame.png"
 
-
-# ============================================================
-# NUKEM ROASTBOT
-# COMPACT HIGH-QUALITY PNG EDITION
-# ============================================================
-
-BASE_DIR = os.path.dirname(
-    os.path.abspath(__file__)
-)
-
-ASSETS_DIR = os.path.join(
-    BASE_DIR,
-    "assets"
-)
-
-OUTPUT_DIR = os.path.join(
-    BASE_DIR,
-    "generated_roasts"
-)
-
-FRAME_FILE = os.path.join(
-    ASSETS_DIR,
-    "nukem_labs_industrial_overlay.png"
-)
+OUTPUT_DIR.mkdir(exist_ok=True)
 
 
-# ============================================================
-# OUTPUT
-# ============================================================
-
-TARGET_WIDTH = 520
+def safe_name(value: str) -> str:
+    value = re.sub(r"[^A-Za-z0-9_-]+", "_", value.strip())
+    return value[:40] or "user"
 
 
-# ============================================================
-# COLORS
-# ============================================================
-
-USERNAME_COLOR = (
-    145,
-    155,
-    255
-)
-
-BODY_COLOR = (
-    248,
-    248,
-    248
-)
-
-FOOTER_GRAY = (
-    185,
-    185,
-    185
-)
-
-NUKEM_YELLOW = (
-    255,
-    210,
-    0
-)
-
-TEXT_EDGE = (
-    0,
-    0,
-    0
-)
-
-
-# ============================================================
-# DIRECTORIES
-# ============================================================
-
-def ensure_dirs():
-
-    os.makedirs(
-        OUTPUT_DIR,
-        exist_ok=True
-    )
-
-
-# ============================================================
-# SAFE FILENAMES
-# ============================================================
-
-def safe_filename(text):
-
-    text = re.sub(
-        r"[^a-zA-Z0-9_-]+",
-        "_",
-        text
-    )
-
-    text = text.strip("_")
-
-    return text or "user"
-
-
-# ============================================================
-# FONT LOADING
-# ============================================================
-
-def load_font(
-    size,
-    bold=False
-):
-
+def get_font(size: int, bold: bool = False):
     candidates = []
 
-    if os.name == "nt":
-
-        if bold:
-
-            candidates.extend([
-                r"C:\Windows\Fonts\segoeuib.ttf",
-                r"C:\Windows\Fonts\arialbd.ttf",
-                r"C:\Windows\Fonts\verdanab.ttf",
-                r"C:\Windows\Fonts\bahnschrift.ttf",
-            ])
-
-        else:
-
-            candidates.extend([
-                r"C:\Windows\Fonts\segoeui.ttf",
-                r"C:\Windows\Fonts\arial.ttf",
-                r"C:\Windows\Fonts\verdana.ttf",
-                r"C:\Windows\Fonts\bahnschrift.ttf",
-            ])
-
     if bold:
-
         candidates.extend([
+            "C:/Windows/Fonts/segoeuib.ttf",
+            "C:/Windows/Fonts/arialbd.ttf",
+            "C:/Windows/Fonts/calibrib.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
         ])
-
     else:
-
         candidates.extend([
+            "C:/Windows/Fonts/segoeui.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            "C:/Windows/Fonts/calibri.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/dejavu/DejaVuSans.ttf",
         ])
 
     for font_path in candidates:
-
-        if os.path.exists(
-            font_path
-        ):
-
-            try:
-
-                return ImageFont.truetype(
-                    font_path,
-                    size
-                )
-
-            except Exception:
-
-                pass
+        if Path(font_path).exists():
+            return ImageFont.truetype(font_path, size=size)
 
     return ImageFont.load_default()
 
 
-# ============================================================
-# TEXT MEASUREMENT
-# ============================================================
-
-def text_size(
-    draw,
-    text,
-    font
-):
-
-    bbox = draw.textbbox(
-        (0, 0),
-        text,
-        font=font,
-        stroke_width=1
-    )
-
-    return (
-        bbox[2] - bbox[0],
-        bbox[3] - bbox[1]
-    )
+def text_width(draw, text, font):
+    if not text:
+        return 0
+    box = draw.textbbox((0, 0), text, font=font)
+    return box[2] - box[0]
 
 
-# ============================================================
-# CLEAN ROAST TEXT
-# ============================================================
-
-def clean_roast_for_card(
-    username,
-    roast_text
-):
-
-    if not roast_text:
-
-        return ""
-
-    clean_username = (
-        username
-        .lstrip("@")
-        .strip()
-    )
-
-    text = roast_text.strip()
-
-    patterns = [
-        rf"^@{re.escape(clean_username)}\s*[,:\-–—]?\s*",
-        rf"^{re.escape(clean_username)}\s*[,:\-–—]?\s*",
-    ]
-
-    name_removed = False
-
-    for pattern in patterns:
-
-        new_text = re.sub(
-            pattern,
-            "",
-            text,
-            count=1,
-            flags=re.IGNORECASE
-        )
-
-        if new_text != text:
-
-            text = new_text.strip()
-
-            name_removed = True
-
-            break
-
-    if name_removed:
-
-        replacements = [
-            (r"^is\b", "You are"),
-            (r"^was\b", "You were"),
-            (r"^has\b", "You have"),
-            (r"^had\b", "You had"),
-            (r"^does\b", "You do"),
-            (r"^did\b", "You did"),
-            (r"^looks\b", "You look"),
-            (r"^looked\b", "You looked"),
-            (r"^seems\b", "You seem"),
-            (r"^seemed\b", "You seemed"),
-            (r"^sounds\b", "You sound"),
-            (r"^acts\b", "You act"),
-            (r"^walks\b", "You walk"),
-            (r"^wanders\b", "You wander"),
-            (r"^thinks\b", "You think"),
-            (r"^makes\b", "You make"),
-            (r"^brings\b", "You bring"),
-            (r"^gives\b", "You give"),
-            (r"^needs\b", "You need"),
-            (r"^deserves\b", "You deserve"),
-            (r"^plays\b", "You play"),
-            (r"^runs\b", "You run"),
-            (r"^tries\b", "You try"),
-            (r"^keeps\b", "You keep"),
-            (r"^could\b", "You could"),
-            (r"^would\b", "You would"),
-            (r"^will\b", "You will"),
-            (r"^can\b", "You can"),
-            (r"^can't\b", "You can't"),
-            (r"^won't\b", "You won't"),
-        ]
-
-        replaced = False
-
-        for pattern, replacement in replacements:
-
-            new_text = re.sub(
-                pattern,
-                replacement,
-                text,
-                count=1,
-                flags=re.IGNORECASE
-            )
-
-            if new_text != text:
-
-                text = new_text
-
-                replaced = True
-
-                break
-
-        if not replaced and text:
-
-            text = (
-                text[0].upper()
-                + text[1:]
-            )
-
-    elif text:
-
-        text = (
-            text[0].upper()
-            + text[1:]
-        )
-
-    return text
+def line_height(draw, font):
+    box = draw.textbbox((0, 0), "Ag", font=font)
+    return box[3] - box[1]
 
 
-# ============================================================
-# WORD WRAPPING
-# ============================================================
-
-def wrap_text(
-    draw,
-    text,
-    font,
-    max_width
-):
-
+def wrap_text(draw, text, font, max_width):
     words = text.split()
-
     if not words:
-
         return [""]
 
     lines = []
-
     current = words[0]
 
     for word in words[1:]:
-
-        test = (
-            current
-            + " "
-            + word
-        )
-
-        width, _ = text_size(
-            draw,
-            test,
-            font
-        )
-
-        if width <= max_width:
-
+        test = current + " " + word
+        if text_width(draw, test, font) <= max_width:
             current = test
-
         else:
-
-            lines.append(
-                current
-            )
-
+            lines.append(current)
             current = word
 
-    if current:
-
-        lines.append(
-            current
-        )
-
+    lines.append(current)
     return lines
 
 
-# ============================================================
-# AUTO-FIT ROAST TEXT
-# ============================================================
+def choose_body_font_and_lines(draw, roast_text, max_width, max_height):
+    # Bigger text first. Only shrink if needed.
+    for size in [18, 17, 16]:
+        font = get_font(size, bold=True)
+        lines = wrap_text(draw, roast_text, font, max_width)
+        lh = line_height(draw, font)
+        spacing = max(5, int(size * 0.32))
+        total_height = (len(lines) * lh) + ((len(lines) - 1) * spacing)
 
-def fit_roast_text(
-    draw,
-    text,
-    max_width,
-    max_height
-):
+        if total_height <= max_height:
+            return font, lines, spacing
 
-    for font_size in range(
-        15,
-        10,
-        -1
-    ):
-
-        font = load_font(
-            font_size,
-            bold=True
-        )
-
-        lines = wrap_text(
-            draw,
-            text,
-            font,
-            max_width
-        )
-
-        line_height = (
-            font_size
-            + 5
-        )
-
-        total_height = (
-            len(lines)
-            * line_height
-        )
-
-        if (
-            len(lines) <= 5
-            and
-            total_height <= max_height
-        ):
-
-            return (
-                font,
-                lines,
-                line_height
-            )
-
-    font = load_font(
-        10,
-        bold=True
-    )
-
-    lines = wrap_text(
-        draw,
-        text,
-        font,
-        max_width
-    )
-
-    return (
-        font,
-        lines[:5],
-        15
-    )
+    # Worst case fallback
+    font = get_font(16, bold=True)
+    lines = wrap_text(draw, roast_text, font, max_width)
+    spacing = 5
+    return font, lines, spacing
 
 
-# ============================================================
-# SHARP TEXT
-# ============================================================
-
-def draw_sharp_text(
-    draw,
-    position,
-    text,
-    font,
-    fill
-):
-
-    draw.text(
-        position,
-        text,
-        font=font,
-        fill=fill,
-        stroke_width=1,
-        stroke_fill=TEXT_EDGE
-    )
-
-
-# ============================================================
-# LOAD ARTWORK
-# ============================================================
-
-def load_base_frame():
-
-    if not os.path.exists(
-        FRAME_FILE
-    ):
-
+def create_roast_card(username: str, roast_text: str) -> str:
+    if not FRAME_FILE.exists():
         raise FileNotFoundError(
-            f"Missing asset:\n"
-            f"{FRAME_FILE}"
+            f"Missing asset:\n{FRAME_FILE}\n\nPut roast_frame.png inside the assets folder."
         )
 
-    base = Image.open(
-        FRAME_FILE
-    ).convert(
-        "RGB"
-    )
+    frame = Image.open(FRAME_FILE).convert("RGBA")
+    img = frame.copy()
+    draw = ImageDraw.Draw(img)
 
-    scale = (
-        TARGET_WIDTH
-        / base.width
-    )
+    # Base design was tuned around 520px width.
+    scale = img.width / 520.0
 
-    target_height = int(
-        round(
-            base.height
-            * scale
-        )
-    )
+    def sx(value):
+        return int(value * scale)
 
-    base = base.resize(
-        (
-            TARGET_WIDTH,
-            target_height
-        ),
-        Image.Resampling.LANCZOS
-    )
+    def sy(value):
+        return int(value * scale)
 
-    base = (
-        ImageEnhance
-        .Sharpness(
-            base
-        )
-        .enhance(
-            1.08
-        )
-    )
+    # -------- COLORS --------
+    USERNAME_COLOR = (112, 132, 255)
+    BODY_COLOR = (255, 255, 255)
+    BRAND_COLOR = (248, 214, 38)
+    FOOTER_COLOR = (215, 215, 215)
+    LINE_COLOR = (239, 203, 18)
 
-    return base
+    # -------- FONTS --------
+    username_font = get_font(sx(17), bold=True)
+    brand_font = get_font(sx(10), bold=True)
+    footer_font = get_font(sx(9), bold=False)
 
+    # -------- TEXT AREA --------
+    # Slightly higher so it sits better visually.
+    username_x = sx(120)
+    username_y = sy(90)
 
-# ============================================================
-# DRAW CARD CONTENT
-# ============================================================
+    body_x = sx(120)
+    body_y = sy(122)
+    body_max_width = sx(270)
+    body_max_height = sy(118)
 
-def add_roast_content(
-    base,
-    username,
-    roast_text
-):
-
-    draw = ImageDraw.Draw(
-        base
-    )
-
-    width, height = base.size
-
-
-    # --------------------------------------------------------
-    # FINAL LAYOUT
-    # --------------------------------------------------------
-
-    text_left = int(
-        width * 0.295
-    )
-
-    text_right = int(
-        width * 0.770
-    )
-
-    username_y = int(
-        height * 0.273
-    )
-
-    body_top = int(
-        height * 0.363
-    )
-
-    divider_y = int(
-        height * 0.685
-    )
-
-    footer_y = int(
-        height * 0.718
-    )
-
-    max_text_width = (
-        text_right
-        - text_left
-    )
-
-    max_body_height = (
-        divider_y
-        - body_top
-        - 9
-    )
-
-
-    # --------------------------------------------------------
-    # USERNAME
-    # --------------------------------------------------------
-
-    username_font = load_font(
-        15,
-        bold=True
-    )
-
-    display_username = (
-        username
-        if username.startswith("@")
-        else "@"
-        + username
-    )
-
-    roast_text = clean_roast_for_card(
-        display_username,
-        roast_text
-    )
-
-    draw_sharp_text(
-        draw,
-        (
-            text_left,
-            username_y
-        ),
-        display_username,
-        username_font,
-        USERNAME_COLOR
-    )
-
-
-    # --------------------------------------------------------
-    # ROAST BODY
-    # --------------------------------------------------------
-
-    (
-        roast_font,
-        roast_lines,
-        line_height
-    ) = fit_roast_text(
+    body_font, roast_lines, body_spacing = choose_body_font_and_lines(
         draw,
         roast_text,
-        max_text_width,
-        max_body_height
+        body_max_width,
+        body_max_height
     )
 
-    current_y = body_top
+    # -------- FOOTER --------
+    divider_x1 = sx(120)
+    divider_x2 = sx(390)
+    divider_y = sy(250)
 
-    for line in roast_lines:
+    brand_x = sx(120)
+    brand_y = sy(258)
 
-        draw_sharp_text(
-            draw,
-            (
-                text_left,
-                current_y
-            ),
-            line,
-            roast_font,
-            BODY_COLOR
-        )
-
-        current_y += (
-            line_height
-        )
-
-
-    # --------------------------------------------------------
-    # DIVIDER
-    # --------------------------------------------------------
-
-    draw.line(
-        (
-            text_left,
-            divider_y,
-            text_right,
-            divider_y
-        ),
-        fill=NUKEM_YELLOW,
-        width=2
-    )
-
-
-    # --------------------------------------------------------
-    # FOOTER
-    # --------------------------------------------------------
-
-    footer_bold_font = load_font(
-        9,
-        bold=True
-    )
-
-    footer_font = load_font(
-        9,
-        bold=False
-    )
-
+    # -------- DRAW USERNAME --------
     draw.text(
-        (
-            text_left,
-            footer_y
-        ),
-        "NukemLabs",
-        font=footer_bold_font,
-        fill=NUKEM_YELLOW
-    )
-
-    nukem_width, _ = text_size(
-        draw,
-        "NukemLabs",
-        footer_bold_font
-    )
-
-    draw.text(
-        (
-            text_left
-            + nukem_width
-            + 6,
-            footer_y
-        ),
-        "•  We regret nothing.",
-        font=footer_font,
-        fill=FOOTER_GRAY
-    )
-
-    return base
-
-
-# ============================================================
-# SAVE PNG
-# ============================================================
-
-def save_png(
-    image,
-    username
-):
-
-    ensure_dirs()
-
-    timestamp = datetime.now().strftime(
-        "%Y%m%d_%H%M%S"
-    )
-
-    clean_name = safe_filename(
-        username.replace(
-            "@",
-            ""
-        )
-    )
-
-    output_path = os.path.join(
-        OUTPUT_DIR,
-        (
-            f"roast_"
-            f"{clean_name}_"
-            f"{timestamp}.png"
-        )
-    )
-
-    image.save(
-        output_path,
-        format="PNG",
-        optimize=True,
-        compress_level=6
-    )
-
-    return output_path
-
-
-# ============================================================
-# PUBLIC FUNCTION USED BY BOT.PY
-# ============================================================
-
-def create_roast_card(
-    username,
-    roast_text
-):
-
-    base = load_base_frame()
-
-    card = add_roast_content(
-        base,
+        (username_x, username_y),
         username,
-        roast_text
+        font=username_font,
+        fill=USERNAME_COLOR
     )
 
-    return save_png(
-        card,
-        username
+    # -------- DRAW ROAST --------
+    lh = line_height(draw, body_font)
+    current_y = body_y
+    for line in roast_lines:
+        draw.text(
+            (body_x, current_y),
+            line,
+            font=body_font,
+            fill=BODY_COLOR
+        )
+        current_y += lh + body_spacing
+
+    # -------- DIVIDER --------
+    draw.line(
+        [(divider_x1, divider_y), (divider_x2, divider_y)],
+        fill=LINE_COLOR,
+        width=max(2, sx(2))
     )
 
+    # -------- FOOTER --------
+    brand_text = "NukemLabs"
+    footer_text = "•  We regret nothing."
 
-generate_roast_card = (
-    create_roast_card
-)
+    draw.text(
+        (brand_x, brand_y),
+        brand_text,
+        font=brand_font,
+        fill=BRAND_COLOR
+    )
 
-make_roast_card = (
-    create_roast_card
-)
+    brand_w = text_width(draw, brand_text, brand_font)
 
+    draw.text(
+        (brand_x + brand_w + sx(8), brand_y + sy(1)),
+        footer_text,
+        font=footer_font,
+        fill=FOOTER_COLOR
+    )
 
-# ============================================================
-# LOCAL TEST
-# ============================================================
+    # -------- SAVE --------
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"roast_{safe_name(username)}_{timestamp}.png"
+    output_path = OUTPUT_DIR / filename
+
+    img.save(output_path, format="PNG", optimize=True)
+    return str(output_path)
+
 
 if __name__ == "__main__":
-
-    test_username = (
-        "@DudeNukem"
-    )
-
+    test_username = "@DudeNukem"
     test_roast = (
-        "DudeNukem carries the frantic, disheveled "
-        "energy of a man trying to explain quantum "
-        "physics to a toaster while actively forgetting "
-        "how to fucking breathe."
+        "Carries the frantic, disheveled energy of a man trying to explain "
+        "quantum physics to a toaster while actively forgetting how to fucking breathe."
     )
 
-    result = create_roast_card(
-        test_username,
-        test_roast
-    )
+    result = create_roast_card(test_username, test_roast)
 
-    file_size_kb = (
-        os.path.getsize(
-            result
-        )
-        / 1024
-    )
-
-    print()
-
-    print(
-        "HIGH-QUALITY NUKEM PNG CREATED"
-    )
-
-    print(
-        "------------------------------"
-    )
-
-    print(
-        result
-    )
-
-    print(
-        f"Width: {TARGET_WIDTH}px"
-    )
-
-    print(
-        f"File size: "
-        f"{file_size_kb:.0f} KB"
-    )
-
-    print()
+    print("NUKEM ROAST CARD CREATED")
+    print("-" * 28)
+    print(result)
