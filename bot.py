@@ -20,11 +20,11 @@ from card_maker import create_roast_card
 
 
 # ============================================================
-# NUKEM ROASTBOT 4.5
-# ANIMATED NUKEMLABS EDITION
+# NUKEM ROASTBOT 4.6
+# ONBOARDING EDITION
 # ============================================================
 
-VERSION = "4.5"
+VERSION = "4.6"
 
 
 # ============================================================
@@ -339,7 +339,7 @@ def init_database():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS roast_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            build_id INTEGER DEFAULT 45,
+            build_id INTEGER DEFAULT 46,
             guild_id INTEGER,
             user_id INTEGER,
             roast_text TEXT,
@@ -387,7 +387,7 @@ def init_database():
         (
             "build_id",
             "ALTER TABLE roast_history "
-            "ADD COLUMN build_id INTEGER DEFAULT 45"
+            "ADD COLUMN build_id INTEGER DEFAULT 46"
         ),
 
         (
@@ -696,7 +696,7 @@ def save_roast(
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        45,
+        46,
         guild_id,
         user_id,
         roast_text,
@@ -1347,6 +1347,755 @@ async def send_roast_card_channel(
 
 
 # ============================================================
+# INTERACTIVE SERVER SETUP
+# ============================================================
+
+def build_setup_embed(
+    setup_view,
+    complete=False
+):
+
+    channel_text = (
+        f"<#{setup_view.channel_id}>"
+        if setup_view.channel_id
+        else "Not configured"
+    )
+
+    auto_text = (
+        "☢️ ON"
+        if setup_view.bully_enabled
+        else "😇 OFF"
+    )
+
+    if complete:
+
+        title = "☢️ NUKEM ROASTBOT SETUP COMPLETE"
+
+        description = (
+            "Configuration saved. "
+            "This server is ready for controlled destruction."
+        )
+
+    else:
+
+        title = "☢️ NUKEM ROASTBOT SETUP"
+
+        description = (
+            "Configure automatic roasting for this server.\n\n"
+            "Use the menus below, then press **Finish Setup**.\n"
+            "Nothing is saved until you finish."
+        )
+
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=NUKEM_YELLOW
+    )
+
+    embed.add_field(
+        name="Roast Channel",
+        value=channel_text,
+        inline=False
+    )
+
+    embed.add_field(
+        name="Auto Roast",
+        value=auto_text,
+        inline=True
+    )
+
+    embed.add_field(
+        name="Interval",
+        value=(
+            f"{setup_view.interval_minutes} minutes"
+        ),
+        inline=True
+    )
+
+    embed.add_field(
+        name="Roast Chance",
+        value=(
+            f"{setup_view.roast_chance}%"
+        ),
+        inline=True
+    )
+
+    embed.add_field(
+        name="User Cooldown",
+        value=(
+            f"{setup_view.user_cooldown_minutes} minutes"
+        ),
+        inline=True
+    )
+
+    if complete:
+
+        if setup_view.bully_enabled:
+
+            embed.add_field(
+                name="Status",
+                value=(
+                    "Automatic roasting is armed. "
+                    "The first attempt will happen after "
+                    f"{setup_view.interval_minutes} minutes."
+                ),
+                inline=False
+            )
+
+        else:
+
+            embed.add_field(
+                name="Status",
+                value=(
+                    "Automatic roasting is disabled. "
+                    "Manual `/roast` and `/roastme` commands "
+                    "still work."
+                ),
+                inline=False
+            )
+
+        embed.set_footer(
+            text=(
+                f"NukemLabs • Setup saved • v{VERSION}"
+            )
+        )
+
+    else:
+
+        embed.set_footer(
+            text=(
+                "Only the admin who opened setup "
+                "can use these controls."
+            )
+        )
+
+    return embed
+
+
+class SetupChannelSelect(
+    discord.ui.ChannelSelect
+):
+
+    def __init__(self):
+
+        super().__init__(
+            placeholder="1. Choose the automatic roast channel",
+            channel_types=[
+                discord.ChannelType.text
+            ],
+            min_values=1,
+            max_values=1,
+            row=0
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction
+    ):
+
+        setup_view = self.view
+
+        if not isinstance(
+            setup_view,
+            SetupView
+        ):
+
+            return
+
+        selected_channel = self.values[0]
+
+        setup_view.channel_id = (
+            selected_channel.id
+        )
+
+        await interaction.response.edit_message(
+            embed=build_setup_embed(
+                setup_view
+            ),
+            view=setup_view
+        )
+
+
+class SetupIntervalSelect(
+    discord.ui.Select
+):
+
+    def __init__(
+        self,
+        current_interval
+    ):
+
+        interval_choices = [
+            5,
+            10,
+            15,
+            30,
+            60,
+            120,
+            240,
+            360,
+            720,
+            1440
+        ]
+
+        if current_interval not in interval_choices:
+
+            interval_choices.append(
+                current_interval
+            )
+
+            interval_choices.sort()
+
+        options = []
+
+        for minutes in interval_choices:
+
+            if minutes < 60:
+
+                label = (
+                    f"{minutes} minutes"
+                )
+
+            elif minutes == 60:
+
+                label = "1 hour"
+
+            elif minutes % 60 == 0:
+
+                label = (
+                    f"{minutes // 60} hours"
+                )
+
+            else:
+
+                label = (
+                    f"{minutes} minutes"
+                )
+
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    value=str(minutes),
+                    default=(
+                        minutes
+                        == current_interval
+                    )
+                )
+            )
+
+        super().__init__(
+            placeholder="2. Choose automatic roast interval",
+            options=options,
+            min_values=1,
+            max_values=1,
+            row=1
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction
+    ):
+
+        setup_view = self.view
+
+        if not isinstance(
+            setup_view,
+            SetupView
+        ):
+
+            return
+
+        setup_view.interval_minutes = int(
+            self.values[0]
+        )
+
+        for option in self.options:
+
+            option.default = (
+                option.value
+                == self.values[0]
+            )
+
+        await interaction.response.edit_message(
+            embed=build_setup_embed(
+                setup_view
+            ),
+            view=setup_view
+        )
+
+
+class SetupChanceSelect(
+    discord.ui.Select
+):
+
+    def __init__(
+        self,
+        current_chance
+    ):
+
+        chance_choices = [
+            0,
+            25,
+            50,
+            75,
+            100
+        ]
+
+        if current_chance not in chance_choices:
+
+            chance_choices.append(
+                current_chance
+            )
+
+            chance_choices.sort()
+
+        options = []
+
+        for chance in chance_choices:
+
+            if chance == 0:
+
+                description = (
+                    "Never fires automatically"
+                )
+
+            elif chance == 100:
+
+                description = (
+                    "Fires every scheduled attempt"
+                )
+
+            else:
+
+                description = (
+                    f"{chance}% chance each scheduled attempt"
+                )
+
+            options.append(
+                discord.SelectOption(
+                    label=f"{chance}%",
+                    value=str(chance),
+                    description=description,
+                    default=(
+                        chance
+                        == current_chance
+                    )
+                )
+            )
+
+        super().__init__(
+            placeholder="3. Choose automatic roast chance",
+            options=options,
+            min_values=1,
+            max_values=1,
+            row=2
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction
+    ):
+
+        setup_view = self.view
+
+        if not isinstance(
+            setup_view,
+            SetupView
+        ):
+
+            return
+
+        setup_view.roast_chance = int(
+            self.values[0]
+        )
+
+        for option in self.options:
+
+            option.default = (
+                option.value
+                == self.values[0]
+            )
+
+        await interaction.response.edit_message(
+            embed=build_setup_embed(
+                setup_view
+            ),
+            view=setup_view
+        )
+
+
+class SetupAutoRoastButton(
+    discord.ui.Button
+):
+
+    def __init__(
+        self,
+        enabled
+    ):
+
+        super().__init__(
+            label=(
+                "Auto Roast: ON"
+                if enabled
+                else "Auto Roast: OFF"
+            ),
+            style=(
+                discord.ButtonStyle.danger
+                if enabled
+                else discord.ButtonStyle.secondary
+            ),
+            row=3
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction
+    ):
+
+        setup_view = self.view
+
+        if not isinstance(
+            setup_view,
+            SetupView
+        ):
+
+            return
+
+        setup_view.bully_enabled = (
+            not setup_view.bully_enabled
+        )
+
+        self.label = (
+            "Auto Roast: ON"
+            if setup_view.bully_enabled
+            else "Auto Roast: OFF"
+        )
+
+        self.style = (
+            discord.ButtonStyle.danger
+            if setup_view.bully_enabled
+            else discord.ButtonStyle.secondary
+        )
+
+        await interaction.response.edit_message(
+            embed=build_setup_embed(
+                setup_view
+            ),
+            view=setup_view
+        )
+
+
+class SetupFinishButton(
+    discord.ui.Button
+):
+
+    def __init__(self):
+
+        super().__init__(
+            label="Finish Setup",
+            style=discord.ButtonStyle.success,
+            row=3
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction
+    ):
+
+        setup_view = self.view
+
+        if not isinstance(
+            setup_view,
+            SetupView
+        ):
+
+            return
+
+        if not setup_view.channel_id:
+
+            await interaction.response.send_message(
+                "☠️ Pick a roast channel before "
+                "finishing setup.",
+                ephemeral=True
+            )
+
+            return
+
+        channel = (
+            setup_view.guild.get_channel(
+                setup_view.channel_id
+            )
+        )
+
+        if not isinstance(
+            channel,
+            discord.TextChannel
+        ):
+
+            await interaction.response.send_message(
+                "☠️ That roast channel no longer exists. "
+                "Pick another one.",
+                ephemeral=True
+            )
+
+            return
+
+        bot_member = (
+            setup_view.guild.me
+        )
+
+        if bot_member:
+
+            permissions = channel.permissions_for(
+                bot_member
+            )
+
+            missing_permissions = []
+
+            if not permissions.view_channel:
+
+                missing_permissions.append(
+                    "View Channel"
+                )
+
+            if not permissions.send_messages:
+
+                missing_permissions.append(
+                    "Send Messages"
+                )
+
+            if not permissions.attach_files:
+
+                missing_permissions.append(
+                    "Attach Files"
+                )
+
+            if not permissions.read_message_history:
+
+                missing_permissions.append(
+                    "Read Message History"
+                )
+
+            if missing_permissions:
+
+                missing_text = ", ".join(
+                    missing_permissions
+                )
+
+                await interaction.response.send_message(
+                    "☠️ I can't use that channel yet. "
+                    "I need these permissions there: "
+                    f"**{missing_text}**.",
+                    ephemeral=True
+                )
+
+                return
+
+        guild_id = (
+            setup_view.guild.id
+        )
+
+        update_setting(
+            guild_id,
+            "roast_channel_id",
+            setup_view.channel_id
+        )
+
+        update_setting(
+            guild_id,
+            "interval_minutes",
+            setup_view.interval_minutes
+        )
+
+        update_setting(
+            guild_id,
+            "roast_chance",
+            setup_view.roast_chance
+        )
+
+        update_setting(
+            guild_id,
+            "bully_enabled",
+            (
+                1
+                if setup_view.bully_enabled
+                else 0
+            )
+        )
+
+        if setup_view.bully_enabled:
+
+            next_time = (
+                datetime.now(
+                    timezone.utc
+                )
+                + timedelta(
+                    minutes=(
+                        setup_view.interval_minutes
+                    )
+                )
+            )
+
+            update_setting(
+                guild_id,
+                "next_roast_at",
+                next_time.isoformat()
+            )
+
+        else:
+
+            update_setting(
+                guild_id,
+                "next_roast_at",
+                None
+            )
+
+        for child in setup_view.children:
+
+            child.disabled = True
+
+        setup_view.stop()
+
+        await interaction.response.edit_message(
+            embed=build_setup_embed(
+                setup_view,
+                complete=True
+            ),
+            view=setup_view
+        )
+
+
+class SetupView(
+    discord.ui.View
+):
+
+    def __init__(
+        self,
+        guild,
+        owner_id
+    ):
+
+        super().__init__(
+            timeout=900
+        )
+
+        self.guild = guild
+
+        self.owner_id = owner_id
+
+        self.message = None
+
+        settings = get_guild_settings(
+            guild.id
+        )
+
+        self.channel_id = (
+            int(
+                settings[
+                    "roast_channel_id"
+                ]
+            )
+            if settings[
+                "roast_channel_id"
+            ]
+            else None
+        )
+
+        self.interval_minutes = int(
+            settings[
+                "interval_minutes"
+            ]
+        )
+
+        self.roast_chance = int(
+            settings[
+                "roast_chance"
+            ]
+        )
+
+        self.user_cooldown_minutes = int(
+            settings[
+                "user_cooldown_minutes"
+            ]
+        )
+
+        # A brand-new server starts setup with automatic
+        # roasting OFF until the admin explicitly turns it on.
+        # Existing configured servers keep their saved state.
+        self.bully_enabled = (
+            bool(
+                settings[
+                    "bully_enabled"
+                ]
+            )
+            if self.channel_id
+            else False
+        )
+
+        self.add_item(
+            SetupChannelSelect()
+        )
+
+        self.add_item(
+            SetupIntervalSelect(
+                self.interval_minutes
+            )
+        )
+
+        self.add_item(
+            SetupChanceSelect(
+                self.roast_chance
+            )
+        )
+
+        self.add_item(
+            SetupAutoRoastButton(
+                self.bully_enabled
+            )
+        )
+
+        self.add_item(
+            SetupFinishButton()
+        )
+
+    async def interaction_check(
+        self,
+        interaction: discord.Interaction
+    ):
+
+        if interaction.user.id != self.owner_id:
+
+            await interaction.response.send_message(
+                "☠️ This setup panel belongs to the "
+                "admin who opened it. Run `/setup` "
+                "to open your own.",
+                ephemeral=True
+            )
+
+            return False
+
+        return True
+
+    async def on_timeout(self):
+
+        for child in self.children:
+
+            child.disabled = True
+
+        if self.message:
+
+            try:
+
+                await self.message.edit(
+                    view=self
+                )
+
+            except Exception:
+
+                pass
+
+
+# ============================================================
 # AUTOMATIC SERVER BULLY
 # ============================================================
 
@@ -1642,7 +2391,7 @@ async def on_ready():
     )
 
     print(
-        "ANIMATED NUKEMLABS EDITION"
+        "ONBOARDING EDITION"
     )
 
     print(
@@ -1791,6 +2540,81 @@ async def on_command_error(
         f"Command error: "
         f"{error}"
     )
+
+
+# ============================================================
+# SLASH COMMAND: /setup
+# ============================================================
+
+@bot.tree.command(
+    name="setup",
+    description=(
+        "Configure Nukem RoastBot for this server."
+    )
+)
+@app_commands.guild_only()
+@app_commands.default_permissions(
+    manage_guild=True
+)
+async def slash_setup(
+    interaction: discord.Interaction
+):
+
+    if not interaction.guild:
+
+        await interaction.response.send_message(
+            "☠️ `/setup` only works inside a server.",
+            ephemeral=True
+        )
+
+        return
+
+    member = interaction.user
+
+    if not isinstance(
+        member,
+        discord.Member
+    ):
+
+        await interaction.response.send_message(
+            "☠️ I couldn't verify your server permissions.",
+            ephemeral=True
+        )
+
+        return
+
+    if not member.guild_permissions.manage_guild:
+
+        await interaction.response.send_message(
+            "☠️ You need **Manage Server** permission "
+            "to run setup.",
+            ephemeral=True
+        )
+
+        return
+
+    setup_view = SetupView(
+        interaction.guild,
+        interaction.user.id
+    )
+
+    await interaction.response.send_message(
+        embed=build_setup_embed(
+            setup_view
+        ),
+        view=setup_view,
+        ephemeral=True
+    )
+
+    try:
+
+        setup_view.message = (
+            await interaction.original_response()
+        )
+
+    except Exception:
+
+        setup_view.message = None
 
 
 # ============================================================
@@ -2769,7 +3593,7 @@ if __name__ == "__main__":
     print()
 
     print(
-        "Starting Nukem RoastBot 4.5..."
+        "Starting Nukem RoastBot 4.6..."
     )
 
     print()
