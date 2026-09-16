@@ -1179,7 +1179,7 @@ async def send_roast_card_interaction(
 
         discord_file = discord.File(
             str(card_path),
-            filename="nukem_roast.gif"
+            filename="nukem_roast.png"
         )
 
         await interaction.followup.send(
@@ -1241,7 +1241,7 @@ async def send_roast_card_ctx(
 
         discord_file = discord.File(
             str(card_path),
-            filename="nukem_roast.gif"
+            filename="nukem_roast.png"
         )
 
         await ctx.send(
@@ -1303,7 +1303,7 @@ async def send_roast_card_channel(
 
         discord_file = discord.File(
             str(card_path),
-            filename="nukem_roast.gif"
+            filename="nukem_roast.png"
         )
 
         await channel.send(

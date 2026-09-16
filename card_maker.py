@@ -6,14 +6,13 @@ from PIL import (
     Image,
     ImageDraw,
     ImageFont,
-    ImageFilter,
     ImageEnhance,
 )
 
 
 # ============================================================
 # NUKEM ROASTBOT
-# COMPACT DISCORD EDITION
+# COMPACT HIGH-QUALITY PNG EDITION
 # ============================================================
 
 BASE_DIR = os.path.dirname(
@@ -37,25 +36,10 @@ FRAME_FILE = os.path.join(
 
 
 # ============================================================
-# OUTPUT SETTINGS
+# OUTPUT
 # ============================================================
 
 TARGET_WIDTH = 520
-
-FRAME_COUNT = 8
-
-FRAME_DURATIONS = [
-    500,
-    90,
-    90,
-    130,
-    650,
-    90,
-    120,
-    900,
-]
-
-GIF_COLORS = 256
 
 
 # ============================================================
@@ -69,15 +53,15 @@ USERNAME_COLOR = (
 )
 
 BODY_COLOR = (
-    245,
-    245,
-    245
+    248,
+    248,
+    248
 )
 
 FOOTER_GRAY = (
-    180,
-    180,
-    180
+    185,
+    185,
+    185
 )
 
 NUKEM_YELLOW = (
@@ -94,7 +78,7 @@ TEXT_EDGE = (
 
 
 # ============================================================
-# DIRECTORY SETUP
+# DIRECTORIES
 # ============================================================
 
 def ensure_dirs():
@@ -211,7 +195,7 @@ def text_size(
 
 
 # ============================================================
-# CLEAN ROAST
+# CLEAN ROAST TEXT
 # ============================================================
 
 def clean_roast_for_card(
@@ -385,7 +369,7 @@ def wrap_text(
 
 
 # ============================================================
-# AUTOMATIC ROAST FONT FITTING
+# AUTO-FIT ROAST TEXT
 # ============================================================
 
 def fit_roast_text(
@@ -477,7 +461,7 @@ def draw_sharp_text(
 
 
 # ============================================================
-# BASE IMAGE
+# LOAD ARTWORK
 # ============================================================
 
 def load_base_frame():
@@ -494,7 +478,7 @@ def load_base_frame():
     base = Image.open(
         FRAME_FILE
     ).convert(
-        "RGBA"
+        "RGB"
     )
 
     scale = (
@@ -531,191 +515,24 @@ def load_base_frame():
 
 
 # ============================================================
-# NUKEM LABS FLICKER
+# DRAW CARD CONTENT
 # ============================================================
 
-def add_nukem_labs_flicker(
-    frame,
-    frame_index
-):
-
-    width, height = frame.size
-
-    left = int(
-        width * 0.020
-    )
-
-    top = int(
-        height * 0.105
-    )
-
-    right = int(
-        width * 0.235
-    )
-
-    bottom = int(
-        height * 0.465
-    )
-
-    panel_box = (
-        left,
-        top,
-        right,
-        bottom
-    )
-
-    flicker_values = [
-        1.00,
-        0.93,
-        1.07,
-        1.01,
-        1.00,
-        0.96,
-        1.05,
-        1.00,
-    ]
-
-    brightness = (
-        flicker_values[
-            frame_index
-            % len(
-                flicker_values
-            )
-        ]
-    )
-
-    panel = frame.crop(
-        panel_box
-    ).convert(
-        "RGBA"
-    )
-
-    panel = (
-        ImageEnhance
-        .Brightness(
-            panel
-        )
-        .enhance(
-            brightness
-        )
-    )
-
-    grayscale = panel.convert(
-        "L"
-    )
-
-    glow_mask = grayscale.point(
-        lambda value:
-        255
-        if value > 135
-        else 0
-    )
-
-    glow_mask = glow_mask.filter(
-        ImageFilter.GaussianBlur(
-            4
-        )
-    )
-
-    glow_strength = int(
-        38
-        + max(
-            0,
-            brightness - 1.0
-        )
-        * 220
-    )
-
-    glow_alpha = glow_mask.point(
-        lambda value:
-        int(
-            value
-            * min(
-                1.0,
-                glow_strength
-                / 255.0
-            )
-        )
-    )
-
-    glow = Image.new(
-        "RGBA",
-        panel.size,
-        (
-            220,
-            255,
-            45,
-            0
-        )
-    )
-
-    glow.putalpha(
-        glow_alpha
-    )
-
-    result = Image.new(
-        "RGBA",
-        panel.size,
-        (
-            0,
-            0,
-            0,
-            0
-        )
-    )
-
-    result = Image.alpha_composite(
-        result,
-        glow
-    )
-
-    result = Image.alpha_composite(
-        result,
-        panel
-    )
-
-    frame.paste(
-        result,
-        (
-            left,
-            top
-        ),
-        result
-    )
-
-    return frame
-
-
-# ============================================================
-# STATIC TEXT LAYER
-# ============================================================
-
-def make_text_layer(
-    size,
+def add_roast_content(
+    base,
     username,
     roast_text
 ):
 
-    width, height = size
-
-    layer = Image.new(
-        "RGBA",
-        size,
-        (
-            0,
-            0,
-            0,
-            0
-        )
-    )
-
     draw = ImageDraw.Draw(
-        layer
+        base
     )
+
+    width, height = base.size
 
 
     # --------------------------------------------------------
-    # LAYOUT
+    # FINAL LAYOUT
     # --------------------------------------------------------
 
     text_left = int(
@@ -726,18 +543,6 @@ def make_text_layer(
         width * 0.770
     )
 
-
-    # --------------------------------------------------------
-    # MOVED UP
-    #
-    # Previous:
-    # username_y = 0.300
-    # body_top   = 0.390
-    #
-    # New:
-    # about 8 pixels higher on this 520px card.
-    # --------------------------------------------------------
-
     username_y = int(
         height * 0.273
     )
@@ -746,8 +551,6 @@ def make_text_layer(
         height * 0.363
     )
 
-
-    # Footer stays exactly where we liked it.
     divider_y = int(
         height * 0.685
     )
@@ -755,7 +558,6 @@ def make_text_layer(
     footer_y = int(
         height * 0.718
     )
-
 
     max_text_width = (
         text_right
@@ -895,57 +697,15 @@ def make_text_layer(
         fill=FOOTER_GRAY
     )
 
-    return layer
+    return base
 
 
 # ============================================================
-# BUILD FRAMES
+# SAVE PNG
 # ============================================================
 
-def build_frames(
-    username,
-    roast_text
-):
-
-    base = load_base_frame()
-
-    text_layer = make_text_layer(
-        base.size,
-        username,
-        roast_text
-    )
-
-    frames = []
-
-    for frame_index in range(
-        FRAME_COUNT
-    ):
-
-        frame = base.copy()
-
-        frame = add_nukem_labs_flicker(
-            frame,
-            frame_index
-        )
-
-        frame = Image.alpha_composite(
-            frame,
-            text_layer
-        )
-
-        frames.append(
-            frame
-        )
-
-    return frames
-
-
-# ============================================================
-# SAVE GIF
-# ============================================================
-
-def save_gif(
-    frames,
+def save_png(
+    image,
     username
 ):
 
@@ -967,54 +727,22 @@ def save_gif(
         (
             f"roast_"
             f"{clean_name}_"
-            f"{timestamp}.gif"
+            f"{timestamp}.png"
         )
     )
 
-    first_rgb = frames[0].convert(
-        "RGB"
-    )
-
-    first_paletted = first_rgb.quantize(
-        colors=GIF_COLORS,
-        method=Image.Quantize.MEDIANCUT,
-        dither=Image.Dither.NONE
-    )
-
-    gif_frames = [
-        first_paletted
-    ]
-
-    for frame in frames[1:]:
-
-        rgb_frame = frame.convert(
-            "RGB"
-        )
-
-        paletted_frame = rgb_frame.quantize(
-            palette=first_paletted,
-            dither=Image.Dither.NONE
-        )
-
-        gif_frames.append(
-            paletted_frame
-        )
-
-    gif_frames[0].save(
+    image.save(
         output_path,
-        save_all=True,
-        append_images=gif_frames[1:],
-        duration=FRAME_DURATIONS,
-        loop=0,
-        disposal=1,
-        optimize=False
+        format="PNG",
+        optimize=True,
+        compress_level=6
     )
 
     return output_path
 
 
 # ============================================================
-# PUBLIC FUNCTION FOR BOT.PY
+# PUBLIC FUNCTION USED BY BOT.PY
 # ============================================================
 
 def create_roast_card(
@@ -1022,13 +750,16 @@ def create_roast_card(
     roast_text
 ):
 
-    frames = build_frames(
+    base = load_base_frame()
+
+    card = add_roast_content(
+        base,
         username,
         roast_text
     )
 
-    return save_gif(
-        frames,
+    return save_png(
+        card,
         username
     )
 
@@ -1064,24 +795,21 @@ if __name__ == "__main__":
         test_roast
     )
 
-    file_size_mb = (
+    file_size_kb = (
         os.path.getsize(
             result
         )
-        / (
-            1024
-            * 1024
-        )
+        / 1024
     )
 
     print()
 
     print(
-        "COMPACT NUKEM ROAST CARD CREATED"
+        "HIGH-QUALITY NUKEM PNG CREATED"
     )
 
     print(
-        "--------------------------------"
+        "------------------------------"
     )
 
     print(
@@ -1094,7 +822,7 @@ if __name__ == "__main__":
 
     print(
         f"File size: "
-        f"{file_size_mb:.2f} MB"
+        f"{file_size_kb:.0f} KB"
     )
 
     print()
