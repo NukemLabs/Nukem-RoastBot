@@ -12,9 +12,9 @@ from PIL import (
 
 # ============================================================
 # NUKEM ROASTBOT
-# HIGH-DPI PRODUCTION EDITION
+# HIGH-DPI PRODUCTION CARD
 #
-# FINAL CARD DESIGN
+# FINAL SAFE-BOUNDS EDITION
 # ============================================================
 
 BASE_DIR = os.path.dirname(
@@ -41,8 +41,8 @@ FRAME_FILE = os.path.join(
 # HIGH-DPI OUTPUT
 # ============================================================
 
-# Discord displays this at roughly half size.
-# 1040px source = approximately 520px visual footprint.
+# Discord displays this around half size.
+# 1040px source gives us much sharper text in chat.
 TARGET_WIDTH = 1040
 
 
@@ -106,6 +106,11 @@ def safe_filename(text):
 
 # ============================================================
 # FONT LOADING
+#
+# Works on:
+# - Windows
+# - Railway / Linux
+# - Pillow scalable fallback
 # ============================================================
 
 def load_font(
@@ -175,7 +180,7 @@ def load_font(
 
 
     # --------------------------------------------------------
-    # TRY REAL TTF FONTS
+    # TRY REAL TTF FONT
     # --------------------------------------------------------
 
     for font_path in candidates:
@@ -211,21 +216,52 @@ def load_font(
 # TEXT MEASUREMENT
 # ============================================================
 
-def text_size(
+def text_bbox(
     draw,
     text,
     font
 ):
 
-    bbox = draw.textbbox(
+    return draw.textbbox(
         (0, 0),
         text,
         font=font
     )
 
+
+def text_width(
+    draw,
+    text,
+    font
+):
+
+    bbox = text_bbox(
+        draw,
+        text,
+        font
+    )
+
     return (
-        bbox[2] - bbox[0],
-        bbox[3] - bbox[1]
+        bbox[2]
+        - bbox[0]
+    )
+
+
+def text_height(
+    draw,
+    text,
+    font
+):
+
+    bbox = text_bbox(
+        draw,
+        text,
+        font
+    )
+
+    return (
+        bbox[3]
+        - bbox[1]
     )
 
 
@@ -250,12 +286,15 @@ def clean_roast_for_card(
 
     text = roast_text.strip()
 
+
     patterns = [
         rf"^@{re.escape(clean_username)}\s*[,:\-–—]?\s*",
         rf"^{re.escape(clean_username)}\s*[,:\-–—]?\s*",
     ]
 
+
     name_removed = False
+
 
     for pattern in patterns:
 
@@ -311,7 +350,9 @@ def clean_roast_for_card(
             (r"^won't\b", "You won't"),
         ]
 
+
         replaced = False
+
 
         for pattern, replacement in replacements:
 
@@ -371,40 +412,42 @@ def wrap_text(
 
     lines = []
 
-    current = words[0]
+    current_line = words[0]
 
 
     for word in words[1:]:
 
-        test = (
-            current
+        test_line = (
+            current_line
             + " "
             + word
         )
 
-        width, _ = text_size(
-            draw,
-            test,
-            font
-        )
 
-        if width <= max_width:
+        if (
+            text_width(
+                draw,
+                test_line,
+                font
+            )
+            <= max_width
+        ):
 
-            current = test
+            current_line = test_line
 
         else:
 
             lines.append(
-                current
+                current_line
             )
 
-            current = word
+            current_line = word
 
 
-    if current:
+    if current_line:
 
         lines.append(
-            current
+            current_line
         )
 
 
@@ -412,7 +455,135 @@ def wrap_text(
 
 
 # ============================================================
-# HIGH-DPI AUTO FIT
+# BLOCK HEIGHT
+# ============================================================
+
+def calculate_block_height(
+    draw,
+    lines,
+    font,
+    line_gap
+):
+
+    if not lines:
+
+        return 0
+
+
+    total = 0
+
+
+    for index, line in enumerate(
+        lines
+    ):
+
+        total += text_height(
+            draw,
+            line,
+            font
+        )
+
+
+        if index < len(lines) - 1:
+
+            total += line_gap
+
+
+    return total
+
+
+# ============================================================
+# LONG TEXT TRIMMER
+# ============================================================
+
+def trim_text_to_fit(
+    draw,
+    text,
+    font,
+    max_width,
+    max_height,
+    line_gap,
+    max_lines=5
+):
+
+    words = text.split()
+
+
+    while words:
+
+        candidate = (
+            " ".join(words)
+            .rstrip()
+        )
+
+
+        lines = wrap_text(
+            draw,
+            candidate,
+            font,
+            max_width
+        )
+
+
+        block_height = (
+            calculate_block_height(
+                draw,
+                lines,
+                font,
+                line_gap
+            )
+        )
+
+
+        if (
+            len(lines) <= max_lines
+            and
+            block_height <= max_height
+        ):
+
+            if candidate != text:
+
+                last_line = lines[-1]
+
+
+                while (
+                    last_line
+                    and
+                    text_width(
+                        draw,
+                        last_line + "...",
+                        font
+                    )
+                    > max_width
+                ):
+
+                    last_line = (
+                        last_line[:-1]
+                        .rstrip()
+                    )
+
+
+                if last_line:
+
+                    lines[-1] = (
+                        last_line
+                        + "..."
+                    )
+
+
+            return lines
+
+
+        words.pop()
+
+
+    return ["..."]
+
+
+# ============================================================
+# BULLETPROOF AUTO-FIT
+#
+# This guarantees the roast stays inside the safe area.
 # ============================================================
 
 def fit_roast_text(
@@ -422,20 +593,18 @@ def fit_roast_text(
     max_height
 ):
 
-    # Approximately at Discord display size:
-    #
-    # 36px -> ~18px
-    # 34px -> ~17px
-    # 32px -> ~16px
-    # 30px -> ~15px
-
-    for font_size in [
+    font_sizes = [
         36,
         34,
         32,
         30,
         28,
-    ]:
+        26,
+        24,
+    ]
+
+
+    for font_size in font_sizes:
 
         font = load_font(
             font_size,
@@ -451,101 +620,67 @@ def fit_roast_text(
         )
 
 
-        _, glyph_height = text_size(
-            draw,
-            "Ag",
-            font
-        )
-
-
         line_gap = max(
-            8,
+            7,
             int(
                 font_size
-                * 0.25
+                * 0.23
             )
         )
 
 
-        total_height = (
-            len(lines)
-            * glyph_height
-            + max(
-                0,
-                len(lines) - 1
+        block_height = (
+            calculate_block_height(
+                draw,
+                lines,
+                font,
+                line_gap
             )
-            * line_gap
         )
 
 
         if (
             len(lines) <= 5
-            and total_height <= max_height
+            and
+            block_height <= max_height
         ):
 
             return (
                 font,
                 lines,
-                glyph_height,
                 line_gap
             )
 
 
     # --------------------------------------------------------
-    # LONG ROAST FALLBACK
+    # EXTREME LONG-ROAST FALLBACK
+    #
+    # Never leave the box.
     # --------------------------------------------------------
 
     font = load_font(
-        28,
+        24,
         bold=True
     )
 
 
-    lines = wrap_text(
+    line_gap = 7
+
+
+    lines = trim_text_to_fit(
         draw,
         text,
         font,
-        max_width
+        max_width,
+        max_height,
+        line_gap,
+        max_lines=5
     )
-
-
-    _, glyph_height = text_size(
-        draw,
-        "Ag",
-        font
-    )
-
-
-    line_gap = 8
-
-
-    max_lines = int(
-        (
-            max_height
-            + line_gap
-        )
-        / (
-            glyph_height
-            + line_gap
-        )
-    )
-
-
-    max_lines = max(
-        1,
-        max_lines
-    )
-
-
-    lines = lines[
-        :max_lines
-    ]
 
 
     return (
         font,
         lines,
-        glyph_height,
         line_gap
     )
 
@@ -611,7 +746,7 @@ def load_base_frame():
 
 
 # ============================================================
-# DRAW CARD CONTENT
+# DRAW CARD
 # ============================================================
 
 def add_roast_content(
@@ -629,7 +764,9 @@ def add_roast_content(
 
 
     # ========================================================
-    # FINAL LAYOUT
+    # SAFE CONTENT AREA
+    #
+    # These bounds deliberately stop BEFORE the green frame.
     # ========================================================
 
     text_left = int(
@@ -637,18 +774,11 @@ def add_roast_content(
     )
 
 
-    # FINAL POLISH:
+    # Pulled back slightly from the previous version.
     #
-    # Previous production version:
-    #     0.800
-    #
-    # Final version:
-    #     0.815
-    #
-    # This adds roughly 3% more usable line width without
-    # changing any typography or vertical positioning.
+    # This guarantees text stays inside the black panel.
     text_right = int(
-        width * 0.815
+        width * 0.775
     )
 
 
@@ -658,7 +788,7 @@ def add_roast_content(
 
 
     body_top = int(
-        height * 0.365
+        height * 0.355
     )
 
 
@@ -678,10 +808,11 @@ def add_roast_content(
     )
 
 
+    # Extra safety gap above divider.
     max_body_height = (
         divider_y
         - body_top
-        - 24
+        - 30
     )
 
 
@@ -729,7 +860,6 @@ def add_roast_content(
     (
         roast_font,
         roast_lines,
-        glyph_height,
         line_gap
     ) = fit_roast_text(
         draw,
@@ -758,7 +888,11 @@ def add_roast_content(
 
 
         current_y += (
-            glyph_height
+            text_height(
+                draw,
+                line,
+                roast_font
+            )
             + line_gap
         )
 
@@ -811,7 +945,7 @@ def add_roast_content(
     )
 
 
-    brand_width, _ = text_size(
+    brand_width = text_width(
         draw,
         brand_text,
         footer_brand_font
@@ -925,11 +1059,14 @@ if __name__ == "__main__":
     )
 
 
+    # Deliberately long test roast so we can prove the
+    # auto-fit system keeps everything inside the panel.
     test_roast = (
-        "DudeNukem radiates the frantic energy "
-        "of a man trying to defuse a ticking bomb "
-        "by aggressively arguing with the timer "
-        "about its fucking tone of voice."
+        "DudeNukem carries the frantic energy of a man "
+        "trying to explain the history of the universe "
+        "to a brick wall while somehow remaining entirely "
+        "convinced he's the smartest bastard in the room "
+        "despite all available evidence suggesting otherwise."
     )
 
 
@@ -950,11 +1087,11 @@ if __name__ == "__main__":
     print()
 
     print(
-        "FINAL NUKEM ROASTBOT CARD CREATED"
+        "FINAL SAFE-BOUNDS ROAST CARD CREATED"
     )
 
     print(
-        "---------------------------------"
+        "------------------------------------"
     )
 
     print(
