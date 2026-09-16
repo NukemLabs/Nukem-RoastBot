@@ -12,7 +12,10 @@ from PIL import (
 
 # ============================================================
 # NUKEM ROASTBOT
-# HIGH-DPI FINAL TYPOGRAPHY EDITION
+# HIGH-DPI PRODUCTION EDITION
+#
+# IMPORTANT:
+# This version includes a scalable font fallback for Railway.
 # ============================================================
 
 BASE_DIR = os.path.dirname(
@@ -39,8 +42,8 @@ FRAME_FILE = os.path.join(
 # HIGH-DPI OUTPUT
 # ============================================================
 
-# 2X source resolution.
-# Discord can scale this down while preserving cleaner text.
+# Discord displays this around half size.
+# 1040px source = roughly 520px visual footprint.
 TARGET_WIDTH = 1040
 
 
@@ -74,7 +77,7 @@ FOOTER_GRAY = (
 
 
 # ============================================================
-# DIRECTORIES
+# DIRECTORY SETUP
 # ============================================================
 
 def ensure_dirs():
@@ -86,7 +89,7 @@ def ensure_dirs():
 
 
 # ============================================================
-# SAFE FILENAME
+# SAFE FILENAMES
 # ============================================================
 
 def safe_filename(text):
@@ -104,6 +107,15 @@ def safe_filename(text):
 
 # ============================================================
 # FONT LOADING
+#
+# THIS IS THE IMPORTANT FIX.
+#
+# Locally Windows supplies Arial/Segoe UI.
+# Railway may not have those fonts.
+#
+# We try several Linux fonts and generic DejaVu names.
+# If NONE exist, Pillow's built-in scalable font is loaded
+# AT THE REQUESTED SIZE instead of the old tiny default.
 # ============================================================
 
 def load_font(
@@ -112,6 +124,11 @@ def load_font(
 ):
 
     candidates = []
+
+
+    # --------------------------------------------------------
+    # WINDOWS
+    # --------------------------------------------------------
 
     if os.name == "nt":
 
@@ -133,11 +150,23 @@ def load_font(
                 r"C:\Windows\Fonts\bahnschrift.ttf",
             ])
 
+
+    # --------------------------------------------------------
+    # LINUX / RAILWAY
+    # --------------------------------------------------------
+
     if bold:
 
         candidates.extend([
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+
+            "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+
+            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+
+            "DejaVuSans-Bold.ttf",
         ])
 
     else:
@@ -145,26 +174,61 @@ def load_font(
         candidates.extend([
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+
+            "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+
+            "DejaVuSans.ttf",
         ])
+
+
+    # --------------------------------------------------------
+    # TRY REAL TTF FONTS
+    # --------------------------------------------------------
 
     for font_path in candidates:
 
-        if os.path.exists(
-            font_path
-        ):
+        try:
 
-            try:
+            return ImageFont.truetype(
+                font_path,
+                size
+            )
 
-                return ImageFont.truetype(
-                    font_path,
-                    size
-                )
+        except Exception:
 
-            except Exception:
+            pass
 
-                pass
 
-    return ImageFont.load_default()
+    # --------------------------------------------------------
+    # CRITICAL RAILWAY FALLBACK
+    #
+    # Newer Pillow versions support a scalable built-in font.
+    #
+    # The OLD code used:
+    #
+    #     ImageFont.load_default()
+    #
+    # which produced tiny text on Railway.
+    #
+    # We explicitly pass the requested SIZE here.
+    # --------------------------------------------------------
+
+    try:
+
+        return ImageFont.load_default(
+            size=size
+        )
+
+    except TypeError:
+
+        # Extremely old Pillow fallback.
+        # Railway should never reach this with our current
+        # requirements, but it prevents a crash.
+
+        return ImageFont.load_default()
 
 
 # ============================================================
@@ -190,7 +254,7 @@ def text_size(
 
 
 # ============================================================
-# CLEAN ROAST
+# CLEAN ROAST TEXT
 # ============================================================
 
 def clean_roast_for_card(
@@ -234,6 +298,7 @@ def clean_roast_for_card(
             name_removed = True
 
             break
+
 
     if name_removed:
 
@@ -290,6 +355,7 @@ def clean_roast_for_card(
 
                 break
 
+
         if not replaced and text:
 
             text = (
@@ -297,12 +363,14 @@ def clean_roast_for_card(
                 + text[1:]
             )
 
+
     elif text:
 
         text = (
             text[0].upper()
             + text[1:]
         )
+
 
     return text
 
@@ -324,9 +392,11 @@ def wrap_text(
 
         return [""]
 
+
     lines = []
 
     current = words[0]
+
 
     for word in words[1:]:
 
@@ -354,17 +424,19 @@ def wrap_text(
 
             current = word
 
+
     if current:
 
         lines.append(
             current
         )
 
+
     return lines
 
 
 # ============================================================
-# TRUE AUTO-FIT
+# HIGH-DPI AUTO FIT
 # ============================================================
 
 def fit_roast_text(
@@ -373,12 +445,15 @@ def fit_roast_text(
     max_width,
     max_height
 ):
-    """
-    Try progressively smaller high-DPI font sizes.
 
-    Unlike the previous version, this NEVER returns a body
-    block taller than the available space.
-    """
+    # At approximately 50% Discord display size:
+    #
+    # 36px -> ~18px visual
+    # 34px -> ~17px visual
+    # 32px -> ~16px visual
+    # 30px -> ~15px visual
+    #
+    # We do not allow microscopic text anymore.
 
     for font_size in [
         36,
@@ -393,6 +468,7 @@ def fit_roast_text(
             bold=True
         )
 
+
         lines = wrap_text(
             draw,
             text,
@@ -400,18 +476,22 @@ def fit_roast_text(
             max_width
         )
 
+
         _, glyph_height = text_size(
             draw,
             "Ag",
             font
         )
 
+
         line_gap = max(
             8,
             int(
-                font_size * 0.25
+                font_size
+                * 0.25
             )
         )
+
 
         total_height = (
             len(lines)
@@ -422,6 +502,7 @@ def fit_roast_text(
             )
             * line_gap
         )
+
 
         if (
             len(lines) <= 5
@@ -436,12 +517,15 @@ def fit_roast_text(
             )
 
 
-    # Long-roast fallback.
-    # Still large enough to remain readable after Discord scaling.
+    # --------------------------------------------------------
+    # LONG ROAST FALLBACK
+    # --------------------------------------------------------
+
     font = load_font(
         28,
         bold=True
     )
+
 
     lines = wrap_text(
         draw,
@@ -450,15 +534,17 @@ def fit_roast_text(
         max_width
     )
 
+
     _, glyph_height = text_size(
         draw,
         "Ag",
         font
     )
 
+
     line_gap = 8
 
-    # Do not let text enter footer space.
+
     max_lines = int(
         (
             max_height
@@ -470,14 +556,17 @@ def fit_roast_text(
         )
     )
 
+
     max_lines = max(
         1,
         max_lines
     )
 
+
     lines = lines[
         :max_lines
     ]
+
 
     return (
         font,
@@ -488,7 +577,7 @@ def fit_roast_text(
 
 
 # ============================================================
-# BASE IMAGE
+# LOAD BACKGROUND
 # ============================================================
 
 def load_base_frame():
@@ -502,16 +591,19 @@ def load_base_frame():
             f"{FRAME_FILE}"
         )
 
+
     base = Image.open(
         FRAME_FILE
     ).convert(
         "RGB"
     )
 
+
     scale = (
         TARGET_WIDTH
         / base.width
     )
+
 
     target_height = int(
         round(
@@ -520,6 +612,7 @@ def load_base_frame():
         )
     )
 
+
     base = base.resize(
         (
             TARGET_WIDTH,
@@ -527,6 +620,7 @@ def load_base_frame():
         ),
         Image.Resampling.LANCZOS
     )
+
 
     base = (
         ImageEnhance
@@ -538,11 +632,12 @@ def load_base_frame():
         )
     )
 
+
     return base
 
 
 # ============================================================
-# DRAW CONTENT
+# DRAW CARD CONTENT
 # ============================================================
 
 def add_roast_content(
@@ -555,34 +650,38 @@ def add_roast_content(
         image
     )
 
+
     width, height = image.size
 
 
-    # --------------------------------------------------------
-    # CONTENT BOUNDS
-    # --------------------------------------------------------
+    # ========================================================
+    # LAYOUT
+    # ========================================================
 
     text_left = int(
         width * 0.295
     )
 
-    # A little wider than before.
-    # This reduces unnecessary wrapping.
+
     text_right = int(
         width * 0.800
     )
+
 
     username_y = int(
         height * 0.270
     )
 
+
     body_top = int(
         height * 0.365
     )
 
+
     divider_y = int(
         height * 0.700
     )
+
 
     footer_y = int(
         height * 0.725
@@ -594,7 +693,7 @@ def add_roast_content(
         - text_left
     )
 
-    # Protect a clear gap above divider.
+
     max_body_height = (
         divider_y
         - body_top
@@ -602,14 +701,15 @@ def add_roast_content(
     )
 
 
-    # --------------------------------------------------------
+    # ========================================================
     # USERNAME
-    # --------------------------------------------------------
+    # ========================================================
 
     username_font = load_font(
         32,
         bold=True
     )
+
 
     display_username = (
         username
@@ -618,10 +718,12 @@ def add_roast_content(
         + username
     )
 
+
     roast_text = clean_roast_for_card(
         display_username,
         roast_text
     )
+
 
     draw.text(
         (
@@ -630,13 +732,18 @@ def add_roast_content(
         ),
         display_username,
         font=username_font,
-        fill=USERNAME_COLOR
+        fill=USERNAME_COLOR,
+
+        # Same-color stroke slightly reinforces edges if
+        # Railway must use Pillow's fallback font.
+        stroke_width=1,
+        stroke_fill=USERNAME_COLOR
     )
 
 
-    # --------------------------------------------------------
-    # ROAST
-    # --------------------------------------------------------
+    # ========================================================
+    # ROAST BODY
+    # ========================================================
 
     (
         roast_font,
@@ -663,8 +770,14 @@ def add_roast_content(
             ),
             line,
             font=roast_font,
-            fill=BODY_COLOR
+            fill=BODY_COLOR,
+
+            # Same color means this thickens rather than
+            # creating a shadow/outline.
+            stroke_width=1,
+            stroke_fill=BODY_COLOR
         )
+
 
         current_y += (
             glyph_height
@@ -672,9 +785,9 @@ def add_roast_content(
         )
 
 
-    # --------------------------------------------------------
+    # ========================================================
     # DIVIDER
-    # --------------------------------------------------------
+    # ========================================================
 
     draw.line(
         (
@@ -688,23 +801,26 @@ def add_roast_content(
     )
 
 
-    # --------------------------------------------------------
+    # ========================================================
     # FOOTER
-    # --------------------------------------------------------
+    # ========================================================
 
     footer_brand_font = load_font(
         18,
         bold=True
     )
 
+
     footer_font = load_font(
         17,
         bold=False
     )
 
+
     brand_text = (
         "NukemLabs"
     )
+
 
     draw.text(
         (
@@ -716,11 +832,13 @@ def add_roast_content(
         fill=NUKEM_YELLOW
     )
 
+
     brand_width, _ = text_size(
         draw,
         brand_text,
         footer_brand_font
     )
+
 
     draw.text(
         (
@@ -733,6 +851,7 @@ def add_roast_content(
         font=footer_font,
         fill=FOOTER_GRAY
     )
+
 
     return image
 
@@ -748,9 +867,11 @@ def save_png(
 
     ensure_dirs()
 
+
     timestamp = datetime.now().strftime(
         "%Y%m%d_%H%M%S"
     )
+
 
     clean_name = safe_filename(
         username.replace(
@@ -758,6 +879,7 @@ def save_png(
             ""
         )
     )
+
 
     output_path = os.path.join(
         OUTPUT_DIR,
@@ -768,6 +890,7 @@ def save_png(
         )
     )
 
+
     image.save(
         output_path,
         format="PNG",
@@ -775,11 +898,12 @@ def save_png(
         compress_level=1
     )
 
+
     return output_path
 
 
 # ============================================================
-# PUBLIC FUNCTION
+# PUBLIC BOT FUNCTION
 # ============================================================
 
 def create_roast_card(
@@ -789,11 +913,13 @@ def create_roast_card(
 
     base = load_base_frame()
 
+
     card = add_roast_content(
         base,
         username,
         roast_text
     )
+
 
     return save_png(
         card,
@@ -820,6 +946,7 @@ if __name__ == "__main__":
         "@DudeNukem"
     )
 
+
     test_roast = (
         "DudeNukem radiates the frantic energy "
         "of a man trying to defuse a ticking bomb "
@@ -827,10 +954,12 @@ if __name__ == "__main__":
         "about its fucking tone of voice."
     )
 
+
     result = create_roast_card(
         test_username,
         test_roast
     )
+
 
     file_size_kb = (
         os.path.getsize(
@@ -839,14 +968,15 @@ if __name__ == "__main__":
         / 1024
     )
 
+
     print()
 
     print(
-        "HIGH-DPI NUKEM ROAST CARD CREATED"
+        "NUKEM ROASTBOT PRODUCTION CARD CREATED"
     )
 
     print(
-        "---------------------------------"
+        "--------------------------------------"
     )
 
     print(
