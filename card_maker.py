@@ -13,7 +13,7 @@ from PIL import (
 
 # ============================================================
 # NUKEM ROASTBOT
-# DISCORD-SIZED / SHARP TEXT / FINAL LAYOUT
+# COMPACT DISCORD EDITION
 # ============================================================
 
 BASE_DIR = os.path.dirname(
@@ -40,7 +40,7 @@ FRAME_FILE = os.path.join(
 # OUTPUT SETTINGS
 # ============================================================
 
-TARGET_WIDTH = 560
+TARGET_WIDTH = 520
 
 FRAME_COUNT = 8
 
@@ -455,7 +455,7 @@ def fit_roast_text(
 
 
 # ============================================================
-# SHARP TEXT DRAWING
+# SHARP TEXT
 # ============================================================
 
 def draw_sharp_text(
@@ -715,7 +715,7 @@ def make_text_layer(
 
 
     # --------------------------------------------------------
-    # MAIN CONTENT AREA
+    # LAYOUT
     # --------------------------------------------------------
 
     text_left = int(
@@ -723,25 +723,31 @@ def make_text_layer(
     )
 
     text_right = int(
-        width * 0.755
+        width * 0.770
     )
 
+
+    # --------------------------------------------------------
+    # MOVED UP
+    #
+    # Previous:
+    # username_y = 0.300
+    # body_top   = 0.390
+    #
+    # New:
+    # about 8 pixels higher on this 520px card.
+    # --------------------------------------------------------
+
     username_y = int(
-        height * 0.300
+        height * 0.273
     )
 
     body_top = int(
-        height * 0.390
+        height * 0.363
     )
 
 
-    # --------------------------------------------------------
-    # FINAL FOOTER POSITIONING
-    #
-    # These are deliberately higher than the previous
-    # version so they sit fully inside the black panel.
-    # --------------------------------------------------------
-
+    # Footer stays exactly where we liked it.
     divider_y = int(
         height * 0.685
     )
@@ -756,12 +762,10 @@ def make_text_layer(
         - text_left
     )
 
-    # Leave breathing room between final body line
-    # and the yellow divider.
     max_body_height = (
         divider_y
         - body_top
-        - 10
+        - 9
     )
 
 
@@ -770,7 +774,7 @@ def make_text_layer(
     # --------------------------------------------------------
 
     username_font = load_font(
-        16,
+        15,
         bold=True
     )
 
@@ -883,7 +887,7 @@ def make_text_layer(
         (
             text_left
             + nukem_width
-            + 7,
+            + 6,
             footer_y
         ),
         "•  We regret nothing.",
@@ -924,8 +928,6 @@ def build_frames(
             frame_index
         )
 
-        # Text goes on last.
-        # Nothing is resized afterward.
         frame = Image.alpha_composite(
             frame,
             text_layer
@@ -969,11 +971,6 @@ def save_gif(
         )
     )
 
-
-    # --------------------------------------------------------
-    # MASTER PALETTE
-    # --------------------------------------------------------
-
     first_rgb = frames[0].convert(
         "RGB"
     )
@@ -987,11 +984,6 @@ def save_gif(
     gif_frames = [
         first_paletted
     ]
-
-
-    # --------------------------------------------------------
-    # REMAINING FRAMES
-    # --------------------------------------------------------
 
     for frame in frames[1:]:
 
@@ -1007,11 +999,6 @@ def save_gif(
         gif_frames.append(
             paletted_frame
         )
-
-
-    # --------------------------------------------------------
-    # SAVE ANIMATION
-    # --------------------------------------------------------
 
     gif_frames[0].save(
         output_path,
@@ -1090,11 +1077,11 @@ if __name__ == "__main__":
     print()
 
     print(
-        "FINAL NUKEM ROAST CARD CREATED"
+        "COMPACT NUKEM ROAST CARD CREATED"
     )
 
     print(
-        "------------------------------"
+        "--------------------------------"
     )
 
     print(
