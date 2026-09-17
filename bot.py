@@ -7,124 +7,73 @@ import random
 import time
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
-
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-
 from card_maker import create_roast_card
 
-
-# ============================================================
-# NUKEM ROASTBOT 4.6
-# ONBOARDING EDITION
-# ============================================================
-
-VERSION = "4.6"
-
-
-# ============================================================
-# PATHS
-# ============================================================
+VERSION = '4.6.1'
 
 BASE_DIR = Path(__file__).resolve().parent
-
-LEGACY_DATABASE_FILE = str(
-    BASE_DIR / "roastbot.db"
-)
-
-RAILWAY_VOLUME_PATH = os.getenv(
-    "RAILWAY_VOLUME_MOUNT_PATH"
-)
-
-
-# ============================================================
-# PERSISTENT DATABASE STORAGE
-# ============================================================
+LEGACY_DATABASE_FILE = str(BASE_DIR / 'roastbot.db')
+RAILWAY_VOLUME_PATH = os.getenv('RAILWAY_VOLUME_MOUNT_PATH')
 
 if RAILWAY_VOLUME_PATH:
-
     DATA_DIR = RAILWAY_VOLUME_PATH
-
-    os.makedirs(
-        DATA_DIR,
-        exist_ok=True
-    )
-
-    DATABASE_FILE = os.path.join(
-        DATA_DIR,
-        "roastbot.db"
-    )
+    os.makedirs(DATA_DIR, exist_ok=True)
+    DATABASE_FILE = os.path.join(DATA_DIR, 'roastbot.db')
 
     if (
         not os.path.exists(DATABASE_FILE)
         and os.path.exists(LEGACY_DATABASE_FILE)
     ):
-
         shutil.copy2(
             LEGACY_DATABASE_FILE,
             DATABASE_FILE
         )
 
         print(
-            f"Copied existing database to persistent volume: "
-            f"{DATABASE_FILE}"
+            f'Copied existing database to persistent volume: '
+            f'{DATABASE_FILE}'
         )
 
 else:
-
     DATA_DIR = str(BASE_DIR)
-
     DATABASE_FILE = LEGACY_DATABASE_FILE
 
-
-# ============================================================
-# DEFAULT SETTINGS
-# ============================================================
 
 DEFAULT_INTERVAL_MINUTES = 10
 DEFAULT_ROAST_CHANCE = 100
 DEFAULT_COOLDOWN_MINUTES = 30
 
-GEMINI_MODEL = "gemini-3.1-flash-lite"
+GEMINI_MODEL = 'gemini-3.1-flash-lite'
 
-
-# ============================================================
-# ENVIRONMENT
-# ============================================================
 
 load_dotenv(
-    BASE_DIR / ".env"
+    BASE_DIR / '.env'
 )
 
 DISCORD_TOKEN = os.getenv(
-    "DISCORD_TOKEN"
+    'DISCORD_TOKEN'
 )
 
 GEMINI_API_KEY = os.getenv(
-    "GEMINI_API_KEY"
+    'GEMINI_API_KEY'
 )
 
 if not DISCORD_TOKEN:
-
     raise RuntimeError(
-        "DISCORD_TOKEN was not found in .env"
+        'DISCORD_TOKEN was not found in .env'
     )
 
 if not GEMINI_API_KEY:
-
     raise RuntimeError(
-        "GEMINI_API_KEY was not found in .env"
+        'GEMINI_API_KEY was not found in .env'
     )
 
-
-# ============================================================
-# GEMINI
-# ============================================================
 
 gemini_client = genai.Client(
     api_key=GEMINI_API_KEY
@@ -151,10 +100,11 @@ The goal is to make the target laugh while making everyone else say:
 
 STYLE:
 
-1. KEEP IT SHORT.
-   Normally ONE sentence.
-   Occasionally TWO very short sentences.
-   Aim for roughly 10-35 words.
+1. KEEP IT SHORT AND SNAPPY.
+   EXACTLY ONE sentence.
+   Aim for 8-16 words.
+   NEVER exceed 20 words.
+   One setup. One punchline. Stop immediately after the punchline.
 
 2. HIT HARD.
    Do not give polite or soft insults.
@@ -196,6 +146,8 @@ STYLE:
    Never sound like a corporate AI.
    Never write an essay.
    Never write a comedy routine.
+   Never add a second thought after the punchline.
+   Cut every unnecessary word.
 
 7. MAKE EACH ROAST FEEL DIFFERENT.
    Do not recycle the same punchline, metaphor, or sentence structure.
@@ -252,89 +204,55 @@ EXAMPLES OF THE ENERGY:
 "You're proof that evolution occasionally just says, 'Fuck it, ship it.'"
 
 Again:
-KEEP IT SHORT.
+8-16 WORDS IS THE SWEET SPOT.
+20 WORDS IS THE ABSOLUTE MAXIMUM.
+EXACTLY ONE SENTENCE.
 BE SAVAGE.
 BE FUNNY.
 BE CREATIVE.
 ONE PUNCHLINE.
+THEN STOP.
 """
 
 
-# ============================================================
-# FALLBACK ROASTS
-# ============================================================
-
 FALLBACK_ROASTS = [
-
     "{name}, your brain has two settings: confidently wrong and fucking buffering.",
-
     "{name}, if bad decisions paid rent, you'd own the fucking building.",
-
     "{name}, you're not stupid, but intelligence clearly isn't your department.",
-
     "{name}, your confidence is doing some heroic work for your lack of fucking competence.",
-
     "{name}, somewhere your ancestors are wondering where the hell they went wrong.",
-
     "{name}, you have the survival instincts of a moth and the decision-making skills to match.",
-
     "{name}, your brain is like a group project where every member gave up.",
-
     "{name}, I've seen loading screens with better problem-solving skills.",
-
     "{name}, you could trip over a wireless connection.",
-
     "{name}, you're the reason instructions have pictures.",
-
     "{name}, your common sense has apparently entered witness protection.",
-
     "{name}, you're living proof that evolution occasionally says, 'Fuck it, ship it.'",
-
     "{name}, you bring the same energy as a smoke alarm with dying batteries.",
-
     "{name}, your thought process needs a fucking GPS.",
-
     "{name}, you've got the confidence of a genius and the processing power of a microwave.",
-
     "{name}, if awareness were currency, you'd be fucking homeless.",
-
-    "{name}, you're not a disaster. You're the entire fucking disaster response team.",
-
+    "{name}, you're the entire fucking disaster response team disguised as one person.",
     "{name}, your decisions have more red flags than a communist parade.",
-
     "{name}, your brain is running on trial software.",
-
     "{name}, you make bad ideas look like fucking career choices.",
 ]
 
 
-# ============================================================
-# DATABASE
-# ============================================================
-
 def get_db():
-
     conn = sqlite3.connect(
         DATABASE_FILE
     )
 
-    conn.row_factory = (
-        sqlite3.Row
-    )
+    conn.row_factory = sqlite3.Row
 
     return conn
 
 
 def init_database():
-
     conn = get_db()
 
     cursor = conn.cursor()
-
-
-    # --------------------------------------------------------
-    # ROAST HISTORY
-    # --------------------------------------------------------
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS roast_history (
@@ -350,11 +268,6 @@ def init_database():
         )
     """)
 
-
-    # --------------------------------------------------------
-    # SERVER SETTINGS
-    # --------------------------------------------------------
-
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS guild_settings (
             guild_id INTEGER PRIMARY KEY,
@@ -368,50 +281,40 @@ def init_database():
         )
     """)
 
-
-    # --------------------------------------------------------
-    # ROAST HISTORY MIGRATIONS
-    # --------------------------------------------------------
-
     cursor.execute(
-        "PRAGMA table_info(roast_history)"
+        'PRAGMA table_info(roast_history)'
     )
 
     existing_columns = {
-        row["name"]
+        row['name']
         for row in cursor.fetchall()
     }
 
     migrations = [
-
         (
-            "build_id",
-            "ALTER TABLE roast_history "
-            "ADD COLUMN build_id INTEGER DEFAULT 46"
+            'build_id',
+            'ALTER TABLE roast_history '
+            'ADD COLUMN build_id INTEGER DEFAULT 46'
         ),
-
         (
-            "guild_id",
-            "ALTER TABLE roast_history "
-            "ADD COLUMN guild_id INTEGER"
+            'guild_id',
+            'ALTER TABLE roast_history '
+            'ADD COLUMN guild_id INTEGER'
         ),
-
         (
-            "target_name",
-            "ALTER TABLE roast_history "
-            "ADD COLUMN target_name TEXT"
+            'target_name',
+            'ALTER TABLE roast_history '
+            'ADD COLUMN target_name TEXT'
         ),
-
         (
-            "target_id",
-            "ALTER TABLE roast_history "
-            "ADD COLUMN target_id INTEGER"
+            'target_id',
+            'ALTER TABLE roast_history '
+            'ADD COLUMN target_id INTEGER'
         ),
-
         (
-            "roast",
-            "ALTER TABLE roast_history "
-            "ADD COLUMN roast TEXT"
+            'roast',
+            'ALTER TABLE roast_history '
+            'ADD COLUMN roast TEXT'
         ),
     ]
 
@@ -420,69 +323,55 @@ def init_database():
         if column_name not in existing_columns:
 
             try:
-
                 cursor.execute(sql)
 
             except sqlite3.OperationalError:
-
                 pass
 
-
-    # --------------------------------------------------------
-    # SETTINGS MIGRATIONS
-    # --------------------------------------------------------
-
     cursor.execute(
-        "PRAGMA table_info(guild_settings)"
+        'PRAGMA table_info(guild_settings)'
     )
 
     existing_settings = {
-        row["name"]
+        row['name']
         for row in cursor.fetchall()
     }
 
     settings_migrations = [
-
         (
-            "roast_channel_id",
-            "ALTER TABLE guild_settings "
-            "ADD COLUMN roast_channel_id INTEGER"
+            'roast_channel_id',
+            'ALTER TABLE guild_settings '
+            'ADD COLUMN roast_channel_id INTEGER'
         ),
-
         (
-            "interval_minutes",
-            "ALTER TABLE guild_settings "
-            "ADD COLUMN interval_minutes INTEGER DEFAULT 10"
+            'interval_minutes',
+            'ALTER TABLE guild_settings '
+            'ADD COLUMN interval_minutes INTEGER DEFAULT 10'
         ),
-
         (
-            "roast_chance",
-            "ALTER TABLE guild_settings "
-            "ADD COLUMN roast_chance INTEGER DEFAULT 100"
+            'roast_chance',
+            'ALTER TABLE guild_settings '
+            'ADD COLUMN roast_chance INTEGER DEFAULT 100'
         ),
-
         (
-            "user_cooldown_minutes",
-            "ALTER TABLE guild_settings "
-            "ADD COLUMN user_cooldown_minutes INTEGER DEFAULT 30"
+            'user_cooldown_minutes',
+            'ALTER TABLE guild_settings '
+            'ADD COLUMN user_cooldown_minutes INTEGER DEFAULT 30'
         ),
-
         (
-            "bully_enabled",
-            "ALTER TABLE guild_settings "
-            "ADD COLUMN bully_enabled INTEGER DEFAULT 1"
+            'bully_enabled',
+            'ALTER TABLE guild_settings '
+            'ADD COLUMN bully_enabled INTEGER DEFAULT 1'
         ),
-
         (
-            "next_roast_at",
-            "ALTER TABLE guild_settings "
-            "ADD COLUMN next_roast_at TEXT"
+            'next_roast_at',
+            'ALTER TABLE guild_settings '
+            'ADD COLUMN next_roast_at TEXT'
         ),
-
         (
-            "last_auto_target_id",
-            "ALTER TABLE guild_settings "
-            "ADD COLUMN last_auto_target_id INTEGER"
+            'last_auto_target_id',
+            'ALTER TABLE guild_settings '
+            'ADD COLUMN last_auto_target_id INTEGER'
         ),
     ]
 
@@ -491,20 +380,12 @@ def init_database():
         if column_name not in existing_settings:
 
             try:
-
                 cursor.execute(sql)
 
             except sqlite3.OperationalError:
-
                 pass
 
-
-    # --------------------------------------------------------
-    # OLD DATABASE COMPATIBILITY
-    # --------------------------------------------------------
-
     try:
-
         cursor.execute("""
             UPDATE roast_history
             SET roast = roast_text
@@ -513,12 +394,9 @@ def init_database():
         """)
 
     except sqlite3.OperationalError:
-
         pass
 
-
     try:
-
         cursor.execute("""
             UPDATE roast_history
             SET target_id = user_id
@@ -527,12 +405,9 @@ def init_database():
         """)
 
     except sqlite3.OperationalError:
-
         pass
 
-
     try:
-
         cursor.execute("""
             UPDATE roast_history
             SET target_name = 'Unknown'
@@ -540,23 +415,16 @@ def init_database():
         """)
 
     except sqlite3.OperationalError:
-
         pass
-
 
     conn.commit()
 
     conn.close()
 
 
-# ============================================================
-# SETTINGS
-# ============================================================
-
 def ensure_guild_settings(
     guild_id
 ):
-
     conn = get_db()
 
     cursor = conn.cursor()
@@ -586,7 +454,6 @@ def ensure_guild_settings(
 def get_guild_settings(
     guild_id
 ):
-
     ensure_guild_settings(
         guild_id
     )
@@ -615,28 +482,19 @@ def update_setting(
     field,
     value
 ):
-
     allowed_fields = {
-
-        "roast_channel_id",
-
-        "interval_minutes",
-
-        "roast_chance",
-
-        "user_cooldown_minutes",
-
-        "bully_enabled",
-
-        "next_roast_at",
-
-        "last_auto_target_id",
+        'roast_channel_id',
+        'interval_minutes',
+        'roast_chance',
+        'user_cooldown_minutes',
+        'bully_enabled',
+        'next_roast_at',
+        'last_auto_target_id',
     }
 
     if field not in allowed_fields:
-
         raise ValueError(
-            "Invalid setting."
+            'Invalid setting.'
         )
 
     ensure_guild_settings(
@@ -664,17 +522,12 @@ def update_setting(
     conn.close()
 
 
-# ============================================================
-# ROAST HISTORY
-# ============================================================
-
 def save_roast(
     guild_id,
     user_id,
     target_name,
     roast_text
 ):
-
     conn = get_db()
 
     cursor = conn.cursor()
@@ -715,7 +568,6 @@ def get_recent_roasts(
     guild_id,
     limit=20
 ):
-
     conn = get_db()
 
     cursor = conn.cursor()
@@ -736,12 +588,10 @@ def get_recent_roasts(
     conn.close()
 
     return [
-
         {
-            "target_name": row["target_name"],
-            "roast": row["roast"]
+            'target_name': row['target_name'],
+            'roast': row['roast']
         }
-
         for row in rows
     ]
 
@@ -751,7 +601,6 @@ def user_on_cooldown(
     user_id,
     cooldown_minutes
 ):
-
     conn = get_db()
 
     cursor = conn.cursor()
@@ -786,39 +635,27 @@ def user_on_cooldown(
     return row is not None
 
 
-# ============================================================
-# ROAST CLEANING
-# ============================================================
-
 def clean_roast_output(
     text,
     target_name
 ):
-
     if not text:
-
         return None
 
     text = text.strip()
 
     text = text.replace(
-        "```",
-        ""
+        '```',
+        ''
     )
 
     prefixes = [
-
-        "Roast:",
-
-        "ROAST:",
-
-        "Here is your roast:",
-
+        'Roast:',
+        'ROAST:',
+        'Here is your roast:',
         "Here's your roast:",
-
-        "Sure!",
-
-        "Sure,",
+        'Sure!',
+        'Sure,',
     ]
 
     for prefix in prefixes:
@@ -826,20 +663,19 @@ def clean_roast_output(
         if text.lower().startswith(
             prefix.lower()
         ):
-
             text = text[
                 len(prefix):
             ].strip()
 
     text = re.sub(
-        r"<@!?\d+>",
-        "",
+        r'<@!?\d+>',
+        '',
         text
     )
 
     text = re.sub(
-        r"\s+",
-        " ",
+        r'\s+',
+        ' ',
         text
     ).strip()
 
@@ -856,43 +692,79 @@ def clean_roast_output(
                 and text.endswith("'")
             )
         ):
-
             text = text[
                 1:-1
             ].strip()
 
     text = text.replace(
-        "[NAME]",
+        '[NAME]',
         target_name
     )
 
     text = text.replace(
-        "{name}",
+        '{name}',
         target_name
     )
 
     if not text:
-
         return None
 
     return text
 
 
-# ============================================================
-# GEMINI ROAST GENERATION
-# ============================================================
+def roast_word_count(
+    text
+):
+    return len(
+        re.findall(
+            r"\b[\w’'-]+\b",
+            text
+        )
+    )
+
+
+def roast_has_multiple_sentences(
+    text
+):
+    sentence_endings = re.findall(
+        r'[.!?]+(?:\s|$)',
+        text
+    )
+
+    return len(
+        sentence_endings
+    ) > 1
+
+
+def roast_is_short_and_snappy(
+    text
+):
+    if not text:
+        return False
+
+    if roast_word_count(
+        text
+    ) > 20:
+        return False
+
+    if roast_has_multiple_sentences(
+        text
+    ):
+        return False
+
+    return True
+
 
 def generate_gemini_roast(
     target_name,
     recent_roasts=None
 ):
-
     recent_roasts = (
         recent_roasts
         or []
     )
 
-    history_text = ""
+    history_text = ''
 
     if recent_roasts:
 
@@ -906,15 +778,14 @@ their wording, metaphor, punchline, or structure.
         for item in recent_roasts[:20]:
 
             previous = item.get(
-                "roast"
+                'roast'
             )
 
             if previous:
 
                 history_text += (
-                    f"- {previous}\n"
+                    f'- {previous}\n'
                 )
-
 
     prompt = f"""
 TARGET:
@@ -928,10 +799,13 @@ Use profanity when it makes the joke better.
 
 Make the punchline hit hard.
 
-Keep it SHORT:
-10-35 words whenever possible.
+Keep it SHORT AND SNAPPY:
+Aim for 8-16 words.
+NEVER exceed 20 words.
 
-ONE sentence is preferred.
+Write EXACTLY ONE sentence.
+Use one setup and one punchline.
+Stop immediately after the punchline.
 
 Do not write an introduction.
 Do not explain the joke.
@@ -942,9 +816,7 @@ Do not use quotation marks.
 {history_text}
 """
 
-
     last_error = None
-
 
     for attempt in range(3):
 
@@ -959,14 +831,14 @@ Do not use quotation marks.
                     config=types.GenerateContentConfig(
                         system_instruction=ROAST_SYSTEM_PROMPT,
                         temperature=1.15,
-                        max_output_tokens=100,
+                        max_output_tokens=60,
                     ),
                 )
             )
 
             text = getattr(
                 response,
-                "text",
+                'text',
                 None
             )
 
@@ -977,8 +849,17 @@ Do not use quotation marks.
 
             if cleaned:
 
-                return cleaned
+                if roast_is_short_and_snappy(
+                    cleaned
+                ):
+                    return cleaned
 
+                last_error = (
+                    'Generated roast was too long '
+                    'or used more than one sentence.'
+                )
+
+                continue
 
         except Exception as exc:
 
@@ -989,12 +870,11 @@ Do not use quotation marks.
             ).upper()
 
             if (
-                "503" in error_text
-                or "UNAVAILABLE" in error_text
-                or "429" in error_text
-                or "RESOURCE_EXHAUSTED" in error_text
+                '503' in error_text
+                or 'UNAVAILABLE' in error_text
+                or '429' in error_text
+                or 'RESOURCE_EXHAUSTED' in error_text
             ):
-
                 time.sleep(
                     2
                     + attempt * 2
@@ -1004,10 +884,9 @@ Do not use quotation marks.
 
             break
 
-
     print(
-        f"Gemini roast generation failed: "
-        f"{last_error}"
+        f'Gemini roast generation failed: '
+        f'{last_error}'
     )
 
     fallback = random.choice(
@@ -1023,11 +902,8 @@ async def generate_roast(
     target_name,
     guild_id
 ):
-
-    recent_roasts = (
-        get_recent_roasts(
-            guild_id
-        )
+    recent_roasts = get_recent_roasts(
+        guild_id
     )
 
     roast = await asyncio.to_thread(
@@ -1039,10 +915,6 @@ async def generate_roast(
     return roast
 
 
-# ============================================================
-# DISCORD BOT
-# ============================================================
-
 intents = discord.Intents.default()
 
 intents.members = True
@@ -1051,22 +923,16 @@ intents.message_content = True
 
 
 bot = commands.Bot(
-    command_prefix="!",
+    command_prefix='!',
     intents=intents,
     help_command=None
 )
 
 
-# ============================================================
-# FALLBACK EMBEDS
-# ============================================================
-
-NUKEM_YELLOW = (
-    discord.Color.from_rgb(
-        255,
-        204,
-        0
-    )
+NUKEM_YELLOW = discord.Color.from_rgb(
+    255,
+    204,
+    0
 )
 
 
@@ -1074,21 +940,17 @@ def manual_roast_embed(
     member,
     roast
 ):
-
     embed = discord.Embed(
-        title="☢️ ROASTBOT ☢️",
+        title='☢️ ROASTBOT ☢️',
         description=(
-            f"{member.mention}, "
-            f"{roast}"
+            f'{member.mention}, '
+            f'{roast}'
         ),
         color=NUKEM_YELLOW
     )
 
     embed.set_footer(
-        text=(
-            "NukemLabs • "
-            "We regret nothing."
-        )
+        text='NukemLabs • We regret nothing.'
     )
 
     return embed
@@ -1098,35 +960,26 @@ def automatic_roast_embed(
     member,
     roast
 ):
-
     embed = discord.Embed(
-        title="☢️ TARGET ACQUIRED ☢️",
+        title='☢️ TARGET ACQUIRED ☢️',
         description=(
-            f"{member.mention}, "
-            f"{roast}"
+            f'{member.mention}, '
+            f'{roast}'
         ),
         color=NUKEM_YELLOW
     )
 
     embed.set_footer(
-        text=(
-            "NukemLabs • "
-            "We regret nothing."
-        )
+        text='NukemLabs • We regret nothing.'
     )
 
     return embed
 
 
-# ============================================================
-# ANIMATED ROAST CARD HELPERS
-# ============================================================
-
 async def build_roast_card(
     member_name,
     roast
 ):
-
     return await asyncio.to_thread(
         create_roast_card,
         member_name,
@@ -1137,9 +990,7 @@ async def build_roast_card(
 def cleanup_generated_card(
     card_path
 ):
-
     if not card_path:
-
         return
 
     try:
@@ -1149,14 +1000,13 @@ def cleanup_generated_card(
         )
 
         if path.exists():
-
             path.unlink()
 
     except Exception as exc:
 
         print(
-            f"Could not remove temporary roast card: "
-            f"{exc}"
+            f'Could not remove temporary roast card: '
+            f'{exc}'
         )
 
 
@@ -1165,7 +1015,6 @@ async def send_roast_card_interaction(
     member,
     roast
 ):
-
     card_path = None
 
     discord_file = None
@@ -1179,7 +1028,7 @@ async def send_roast_card_interaction(
 
         discord_file = discord.File(
             str(card_path),
-            filename="nukem_roast.png"
+            filename='nukem_roast.png'
         )
 
         await interaction.followup.send(
@@ -1189,8 +1038,8 @@ async def send_roast_card_interaction(
     except Exception as exc:
 
         print(
-            f"Animated roast card error: "
-            f"{exc}"
+            f'Animated roast card error: '
+            f'{exc}'
         )
 
         embed = manual_roast_embed(
@@ -1210,11 +1059,9 @@ async def send_roast_card_interaction(
         if discord_file:
 
             try:
-
                 discord_file.close()
 
             except Exception:
-
                 pass
 
         cleanup_generated_card(
@@ -1227,7 +1074,6 @@ async def send_roast_card_ctx(
     member,
     roast
 ):
-
     card_path = None
 
     discord_file = None
@@ -1241,7 +1087,7 @@ async def send_roast_card_ctx(
 
         discord_file = discord.File(
             str(card_path),
-            filename="nukem_roast.png"
+            filename='nukem_roast.png'
         )
 
         await ctx.send(
@@ -1251,8 +1097,8 @@ async def send_roast_card_ctx(
     except Exception as exc:
 
         print(
-            f"Animated prefix roast card error: "
-            f"{exc}"
+            f'Animated prefix roast card error: '
+            f'{exc}'
         )
 
         embed = manual_roast_embed(
@@ -1272,11 +1118,9 @@ async def send_roast_card_ctx(
         if discord_file:
 
             try:
-
                 discord_file.close()
 
             except Exception:
-
                 pass
 
         cleanup_generated_card(
@@ -1289,7 +1133,6 @@ async def send_roast_card_channel(
     member,
     roast
 ):
-
     card_path = None
 
     discord_file = None
@@ -1303,7 +1146,7 @@ async def send_roast_card_channel(
 
         discord_file = discord.File(
             str(card_path),
-            filename="nukem_roast.png"
+            filename='nukem_roast.png'
         )
 
         await channel.send(
@@ -1313,8 +1156,8 @@ async def send_roast_card_channel(
     except Exception as exc:
 
         print(
-            f"Animated automatic roast card error: "
-            f"{exc}"
+            f'Animated automatic roast card error: '
+            f'{exc}'
         )
 
         embed = automatic_roast_embed(
@@ -1334,11 +1177,9 @@ async def send_roast_card_channel(
         if discord_file:
 
             try:
-
                 discord_file.close()
 
             except Exception:
-
                 pass
 
         cleanup_generated_card(
@@ -1346,44 +1187,43 @@ async def send_roast_card_channel(
         )
 
 
-# ============================================================
-# INTERACTIVE SERVER SETUP
-# ============================================================
-
 def build_setup_embed(
     setup_view,
     complete=False
 ):
-
     channel_text = (
-        f"<#{setup_view.channel_id}>"
+        f'<#{setup_view.channel_id}>'
         if setup_view.channel_id
-        else "Not configured"
+        else 'Not configured'
     )
 
     auto_text = (
-        "☢️ ON"
+        '☢️ ON'
         if setup_view.bully_enabled
-        else "😇 OFF"
+        else '😇 OFF'
     )
 
     if complete:
 
-        title = "☢️ NUKEM ROASTBOT SETUP COMPLETE"
+        title = (
+            '☢️ NUKEM ROASTBOT SETUP COMPLETE'
+        )
 
         description = (
-            "Configuration saved. "
-            "This server is ready for controlled destruction."
+            'Configuration saved. '
+            'This server is ready for controlled destruction.'
         )
 
     else:
 
-        title = "☢️ NUKEM ROASTBOT SETUP"
+        title = (
+            '☢️ NUKEM ROASTBOT SETUP'
+        )
 
         description = (
-            "Configure automatic roasting for this server.\n\n"
-            "Use the menus below, then press **Finish Setup**.\n"
-            "Nothing is saved until you finish."
+            'Configure automatic roasting for this server.\n\n'
+            'Use the menus below, then press **Finish Setup**.\n'
+            'Nothing is saved until you finish.'
         )
 
     embed = discord.Embed(
@@ -1393,37 +1233,37 @@ def build_setup_embed(
     )
 
     embed.add_field(
-        name="Roast Channel",
+        name='Roast Channel',
         value=channel_text,
         inline=False
     )
 
     embed.add_field(
-        name="Auto Roast",
+        name='Auto Roast',
         value=auto_text,
         inline=True
     )
 
     embed.add_field(
-        name="Interval",
+        name='Interval',
         value=(
-            f"{setup_view.interval_minutes} minutes"
+            f'{setup_view.interval_minutes} minutes'
         ),
         inline=True
     )
 
     embed.add_field(
-        name="Roast Chance",
+        name='Roast Chance',
         value=(
-            f"{setup_view.roast_chance}%"
+            f'{setup_view.roast_chance}%'
         ),
         inline=True
     )
 
     embed.add_field(
-        name="User Cooldown",
+        name='User Cooldown',
         value=(
-            f"{setup_view.user_cooldown_minutes} minutes"
+            f'{setup_view.user_cooldown_minutes} minutes'
         ),
         inline=True
     )
@@ -1433,11 +1273,11 @@ def build_setup_embed(
         if setup_view.bully_enabled:
 
             embed.add_field(
-                name="Status",
+                name='Status',
                 value=(
-                    "Automatic roasting is armed. "
-                    "The first attempt will happen after "
-                    f"{setup_view.interval_minutes} minutes."
+                    'Automatic roasting is armed. '
+                    'The first attempt will happen after '
+                    f'{setup_view.interval_minutes} minutes.'
                 ),
                 inline=False
             )
@@ -1445,18 +1285,18 @@ def build_setup_embed(
         else:
 
             embed.add_field(
-                name="Status",
+                name='Status',
                 value=(
-                    "Automatic roasting is disabled. "
-                    "Manual `/roast` and `/roastme` commands "
-                    "still work."
+                    'Automatic roasting is disabled. '
+                    'Manual `/roast` and `/roastme` commands '
+                    'still work.'
                 ),
                 inline=False
             )
 
         embed.set_footer(
             text=(
-                f"NukemLabs • Setup saved • v{VERSION}"
+                f'NukemLabs • Setup saved • v{VERSION}'
             )
         )
 
@@ -1464,8 +1304,8 @@ def build_setup_embed(
 
         embed.set_footer(
             text=(
-                "Only the admin who opened setup "
-                "can use these controls."
+                'Only the admin who opened setup '
+                'can use these controls.'
             )
         )
 
@@ -1476,10 +1316,13 @@ class SetupChannelSelect(
     discord.ui.ChannelSelect
 ):
 
-    def __init__(self):
-
+    def __init__(
+        self
+    ):
         super().__init__(
-            placeholder="1. Choose the automatic roast channel",
+            placeholder=(
+                '1. Choose the automatic roast channel'
+            ),
             channel_types=[
                 discord.ChannelType.text
             ],
@@ -1492,14 +1335,12 @@ class SetupChannelSelect(
         self,
         interaction: discord.Interaction
     ):
-
         setup_view = self.view
 
         if not isinstance(
             setup_view,
             SetupView
         ):
-
             return
 
         selected_channel = self.values[0]
@@ -1524,7 +1365,6 @@ class SetupIntervalSelect(
         self,
         current_interval
     ):
-
         interval_choices = [
             5,
             10,
@@ -1553,23 +1393,23 @@ class SetupIntervalSelect(
             if minutes < 60:
 
                 label = (
-                    f"{minutes} minutes"
+                    f'{minutes} minutes'
                 )
 
             elif minutes == 60:
 
-                label = "1 hour"
+                label = '1 hour'
 
             elif minutes % 60 == 0:
 
                 label = (
-                    f"{minutes // 60} hours"
+                    f'{minutes // 60} hours'
                 )
 
             else:
 
                 label = (
-                    f"{minutes} minutes"
+                    f'{minutes} minutes'
                 )
 
             options.append(
@@ -1584,7 +1424,9 @@ class SetupIntervalSelect(
             )
 
         super().__init__(
-            placeholder="2. Choose automatic roast interval",
+            placeholder=(
+                '2. Choose automatic roast interval'
+            ),
             options=options,
             min_values=1,
             max_values=1,
@@ -1595,14 +1437,12 @@ class SetupIntervalSelect(
         self,
         interaction: discord.Interaction
     ):
-
         setup_view = self.view
 
         if not isinstance(
             setup_view,
             SetupView
         ):
-
             return
 
         setup_view.interval_minutes = int(
@@ -1632,7 +1472,6 @@ class SetupChanceSelect(
         self,
         current_chance
     ):
-
         chance_choices = [
             0,
             25,
@@ -1656,24 +1495,25 @@ class SetupChanceSelect(
             if chance == 0:
 
                 description = (
-                    "Never fires automatically"
+                    'Never fires automatically'
                 )
 
             elif chance == 100:
 
                 description = (
-                    "Fires every scheduled attempt"
+                    'Fires every scheduled attempt'
                 )
 
             else:
 
                 description = (
-                    f"{chance}% chance each scheduled attempt"
+                    f'{chance}% chance each '
+                    f'scheduled attempt'
                 )
 
             options.append(
                 discord.SelectOption(
-                    label=f"{chance}%",
+                    label=f'{chance}%',
                     value=str(chance),
                     description=description,
                     default=(
@@ -1684,7 +1524,9 @@ class SetupChanceSelect(
             )
 
         super().__init__(
-            placeholder="3. Choose automatic roast chance",
+            placeholder=(
+                '3. Choose automatic roast chance'
+            ),
             options=options,
             min_values=1,
             max_values=1,
@@ -1695,14 +1537,12 @@ class SetupChanceSelect(
         self,
         interaction: discord.Interaction
     ):
-
         setup_view = self.view
 
         if not isinstance(
             setup_view,
             SetupView
         ):
-
             return
 
         setup_view.roast_chance = int(
@@ -1732,12 +1572,11 @@ class SetupAutoRoastButton(
         self,
         enabled
     ):
-
         super().__init__(
             label=(
-                "Auto Roast: ON"
+                'Auto Roast: ON'
                 if enabled
-                else "Auto Roast: OFF"
+                else 'Auto Roast: OFF'
             ),
             style=(
                 discord.ButtonStyle.danger
@@ -1751,14 +1590,12 @@ class SetupAutoRoastButton(
         self,
         interaction: discord.Interaction
     ):
-
         setup_view = self.view
 
         if not isinstance(
             setup_view,
             SetupView
         ):
-
             return
 
         setup_view.bully_enabled = (
@@ -1766,9 +1603,9 @@ class SetupAutoRoastButton(
         )
 
         self.label = (
-            "Auto Roast: ON"
+            'Auto Roast: ON'
             if setup_view.bully_enabled
-            else "Auto Roast: OFF"
+            else 'Auto Roast: OFF'
         )
 
         self.style = (
@@ -1789,10 +1626,11 @@ class SetupFinishButton(
     discord.ui.Button
 ):
 
-    def __init__(self):
-
+    def __init__(
+        self
+    ):
         super().__init__(
-            label="Finish Setup",
+            label='Finish Setup',
             style=discord.ButtonStyle.success,
             row=3
         )
@@ -1801,30 +1639,26 @@ class SetupFinishButton(
         self,
         interaction: discord.Interaction
     ):
-
         setup_view = self.view
 
         if not isinstance(
             setup_view,
             SetupView
         ):
-
             return
 
         if not setup_view.channel_id:
 
             await interaction.response.send_message(
-                "☠️ Pick a roast channel before "
-                "finishing setup.",
+                '☠️ Pick a roast channel before '
+                'finishing setup.',
                 ephemeral=True
             )
 
             return
 
-        channel = (
-            setup_view.guild.get_channel(
-                setup_view.channel_id
-            )
+        channel = setup_view.guild.get_channel(
+            setup_view.channel_id
         )
 
         if not isinstance(
@@ -1833,16 +1667,14 @@ class SetupFinishButton(
         ):
 
             await interaction.response.send_message(
-                "☠️ That roast channel no longer exists. "
-                "Pick another one.",
+                '☠️ That roast channel no longer exists. '
+                'Pick another one.',
                 ephemeral=True
             )
 
             return
 
-        bot_member = (
-            setup_view.guild.me
-        )
+        bot_member = setup_view.guild.me
 
         if bot_member:
 
@@ -1855,67 +1687,65 @@ class SetupFinishButton(
             if not permissions.view_channel:
 
                 missing_permissions.append(
-                    "View Channel"
+                    'View Channel'
                 )
 
             if not permissions.send_messages:
 
                 missing_permissions.append(
-                    "Send Messages"
+                    'Send Messages'
                 )
 
             if not permissions.attach_files:
 
                 missing_permissions.append(
-                    "Attach Files"
+                    'Attach Files'
                 )
 
             if not permissions.read_message_history:
 
                 missing_permissions.append(
-                    "Read Message History"
+                    'Read Message History'
                 )
 
             if missing_permissions:
 
-                missing_text = ", ".join(
+                missing_text = ', '.join(
                     missing_permissions
                 )
 
                 await interaction.response.send_message(
                     "☠️ I can't use that channel yet. "
-                    "I need these permissions there: "
-                    f"**{missing_text}**.",
+                    'I need these permissions there: '
+                    f'**{missing_text}**.',
                     ephemeral=True
                 )
 
                 return
 
-        guild_id = (
-            setup_view.guild.id
-        )
+        guild_id = setup_view.guild.id
 
         update_setting(
             guild_id,
-            "roast_channel_id",
+            'roast_channel_id',
             setup_view.channel_id
         )
 
         update_setting(
             guild_id,
-            "interval_minutes",
+            'interval_minutes',
             setup_view.interval_minutes
         )
 
         update_setting(
             guild_id,
-            "roast_chance",
+            'roast_chance',
             setup_view.roast_chance
         )
 
         update_setting(
             guild_id,
-            "bully_enabled",
+            'bully_enabled',
             (
                 1
                 if setup_view.bully_enabled
@@ -1938,7 +1768,7 @@ class SetupFinishButton(
 
             update_setting(
                 guild_id,
-                "next_roast_at",
+                'next_roast_at',
                 next_time.isoformat()
             )
 
@@ -1946,7 +1776,7 @@ class SetupFinishButton(
 
             update_setting(
                 guild_id,
-                "next_roast_at",
+                'next_roast_at',
                 None
             )
 
@@ -1974,7 +1804,6 @@ class SetupView(
         guild,
         owner_id
     ):
-
         super().__init__(
             timeout=900
         )
@@ -1992,40 +1821,37 @@ class SetupView(
         self.channel_id = (
             int(
                 settings[
-                    "roast_channel_id"
+                    'roast_channel_id'
                 ]
             )
             if settings[
-                "roast_channel_id"
+                'roast_channel_id'
             ]
             else None
         )
 
         self.interval_minutes = int(
             settings[
-                "interval_minutes"
+                'interval_minutes'
             ]
         )
 
         self.roast_chance = int(
             settings[
-                "roast_chance"
+                'roast_chance'
             ]
         )
 
         self.user_cooldown_minutes = int(
             settings[
-                "user_cooldown_minutes"
+                'user_cooldown_minutes'
             ]
         )
 
-        # A brand-new server starts setup with automatic
-        # roasting OFF until the admin explicitly turns it on.
-        # Existing configured servers keep their saved state.
         self.bully_enabled = (
             bool(
                 settings[
-                    "bully_enabled"
+                    'bully_enabled'
                 ]
             )
             if self.channel_id
@@ -2063,12 +1889,15 @@ class SetupView(
         interaction: discord.Interaction
     ):
 
-        if interaction.user.id != self.owner_id:
+        if (
+            interaction.user.id
+            != self.owner_id
+        ):
 
             await interaction.response.send_message(
-                "☠️ This setup panel belongs to the "
-                "admin who opened it. Run `/setup` "
-                "to open your own.",
+                '☠️ This setup panel belongs to the '
+                'admin who opened it. Run `/setup` '
+                'to open your own.',
                 ephemeral=True
             )
 
@@ -2076,7 +1905,9 @@ class SetupView(
 
         return True
 
-    async def on_timeout(self):
+    async def on_timeout(
+        self
+    ):
 
         for child in self.children:
 
@@ -2091,13 +1922,8 @@ class SetupView(
                 )
 
             except Exception:
-
                 pass
 
-
-# ============================================================
-# AUTOMATIC SERVER BULLY
-# ============================================================
 
 @tasks.loop(
     minutes=1
@@ -2112,38 +1938,28 @@ async def automatic_bully_loop():
 
         try:
 
-            settings = (
-                get_guild_settings(
-                    guild.id
-                )
+            settings = get_guild_settings(
+                guild.id
             )
 
             if not settings:
-
                 continue
 
             if not settings[
-                "bully_enabled"
+                'bully_enabled'
             ]:
-
                 continue
 
             channel_id = settings[
-                "roast_channel_id"
+                'roast_channel_id'
             ]
 
             if not channel_id:
-
                 continue
 
             next_roast_at = settings[
-                "next_roast_at"
+                'next_roast_at'
             ]
-
-
-            # ------------------------------------------------
-            # NEXT ROAST TIME
-            # ------------------------------------------------
 
             if next_roast_at:
 
@@ -2164,23 +1980,19 @@ async def automatic_bully_loop():
                         )
 
                     if now < next_time:
-
                         continue
 
                 except Exception:
-
                     pass
-
 
             interval = max(
                 1,
                 int(
                     settings[
-                        "interval_minutes"
+                        'interval_minutes'
                     ]
                 )
             )
-
 
             chance = max(
                 0,
@@ -2188,12 +2000,11 @@ async def automatic_bully_loop():
                     100,
                     int(
                         settings[
-                            "roast_chance"
+                            'roast_chance'
                         ]
                     )
                 )
             )
-
 
             next_time = (
                 now
@@ -2202,69 +2013,55 @@ async def automatic_bully_loop():
                 )
             )
 
-
             update_setting(
                 guild.id,
-                "next_roast_at",
+                'next_roast_at',
                 next_time.isoformat()
             )
 
-
-            if random.randint(
-                1,
-                100
-            ) > chance:
-
+            if (
+                random.randint(
+                    1,
+                    100
+                )
+                > chance
+            ):
                 continue
-
 
             channel = guild.get_channel(
                 channel_id
             )
 
             if not channel:
-
                 continue
-
 
             cooldown = max(
                 0,
                 int(
                     settings[
-                        "user_cooldown_minutes"
+                        'user_cooldown_minutes'
                     ]
                 )
             )
 
-
             last_target_id = settings[
-                "last_auto_target_id"
+                'last_auto_target_id'
             ]
-
-
-            # ------------------------------------------------
-            # TARGET SELECTION
-            # ------------------------------------------------
 
             candidates = []
 
-            members = (
-                guild.members[:]
-            )
+            members = guild.members[:]
 
             random.shuffle(
                 members
             )
 
-
             for member in members:
 
                 if member.bot:
-
                     continue
 
                 if member.id == last_target_id:
-
                     continue
 
                 if user_on_cooldown(
@@ -2272,22 +2069,17 @@ async def automatic_bully_loop():
                     member.id,
                     cooldown
                 ):
-
                     continue
 
                 candidates.append(
                     member
                 )
 
-
-            # If everyone got excluded because of the
-            # previous-target rule, try again without it.
             if not candidates:
 
                 for member in members:
 
                     if member.bot:
-
                         continue
 
                     if user_on_cooldown(
@@ -2295,33 +2087,23 @@ async def automatic_bully_loop():
                         member.id,
                         cooldown
                     ):
-
                         continue
 
                     candidates.append(
                         member
                     )
 
-
             if not candidates:
-
                 continue
-
 
             target = random.choice(
                 candidates
             )
 
-
-            # ------------------------------------------------
-            # GENERATE ROAST
-            # ------------------------------------------------
-
             roast = await generate_roast(
                 target.display_name,
                 guild.id
             )
-
 
             save_roast(
                 guild.id,
@@ -2330,17 +2112,11 @@ async def automatic_bully_loop():
                 roast
             )
 
-
             update_setting(
                 guild.id,
-                "last_auto_target_id",
+                'last_auto_target_id',
                 target.id
             )
-
-
-            # ------------------------------------------------
-            # SEND ANIMATED CARD
-            # ------------------------------------------------
 
             await send_roast_card_channel(
                 channel,
@@ -2348,21 +2124,19 @@ async def automatic_bully_loop():
                 roast
             )
 
-
             print(
-                f"[AUTO ROAST] "
-                f"{guild.name} -> "
-                f"{target.display_name}: "
-                f"{roast}"
+                f'[AUTO ROAST] '
+                f'{guild.name} -> '
+                f'{target.display_name}: '
+                f'{roast}'
             )
-
 
         except Exception as exc:
 
             print(
-                f"[AUTO BULLY ERROR] "
-                f"{guild.name}: "
-                f"{exc}"
+                f'[AUTO BULLY ERROR] '
+                f'{guild.name}: '
+                f'{exc}'
             )
 
 
@@ -2372,74 +2146,64 @@ async def before_automatic_bully_loop():
     await bot.wait_until_ready()
 
 
-# ============================================================
-# BOT READY
-# ============================================================
-
 @bot.event
 async def on_ready():
 
     print()
 
     print(
-        "=" * 60
+        '=' * 60
     )
 
     print(
-        f"NUKEM ROASTBOT "
-        f"{VERSION}"
+        f'NUKEM ROASTBOT {VERSION}'
     )
 
     print(
-        "ONBOARDING EDITION"
+        'SHORT & SAVAGE EDITION'
     )
 
     print(
-        "=" * 60
+        '=' * 60
     )
 
     print(
-        f"Logged in as: "
-        f"{bot.user}"
+        f'Logged in as: '
+        f'{bot.user}'
     )
 
     print(
-        f"Connected to "
-        f"{len(bot.guilds)} "
-        f"server(s)"
+        f'Connected to '
+        f'{len(bot.guilds)} '
+        f'server(s)'
     )
 
     print(
-        f"Database: "
-        f"{os.path.abspath(DATABASE_FILE)}"
+        f'Database: '
+        f'{os.path.abspath(DATABASE_FILE)}'
     )
 
     print(
-        f"Gemini model: "
-        f"{GEMINI_MODEL}"
+        f'Gemini model: '
+        f'{GEMINI_MODEL}'
     )
 
     print(
-        f"Default bully interval: "
-        f"{DEFAULT_INTERVAL_MINUTES} "
-        f"minutes"
+        f'Default bully interval: '
+        f'{DEFAULT_INTERVAL_MINUTES} '
+        f'minutes'
     )
 
     print(
-        f"Default roast chance: "
-        f"{DEFAULT_ROAST_CHANCE}%"
+        f'Default roast chance: '
+        f'{DEFAULT_ROAST_CHANCE}%'
     )
 
     print(
-        f"Default user cooldown: "
-        f"{DEFAULT_COOLDOWN_MINUTES} "
-        f"minutes"
+        f'Default user cooldown: '
+        f'{DEFAULT_COOLDOWN_MINUTES} '
+        f'minutes'
     )
-
-
-    # --------------------------------------------------------
-    # SLASH COMMAND SYNC
-    # --------------------------------------------------------
 
     try:
 
@@ -2454,46 +2218,36 @@ async def on_ready():
             )
 
             print(
-                f"Slash commands synced to "
-                f"{guild.name}: "
-                f"{len(synced)} commands"
+                f'Slash commands synced to '
+                f'{guild.name}: '
+                f'{len(synced)} commands'
             )
 
     except Exception as exc:
 
         print(
-            f"Slash command sync failed: "
-            f"{exc}"
+            f'Slash command sync failed: '
+            f'{exc}'
         )
-
-
-    # --------------------------------------------------------
-    # START AUTOMATIC BULLY
-    # --------------------------------------------------------
 
     if not automatic_bully_loop.is_running():
 
         automatic_bully_loop.start()
 
-
     print(
-        "Automatic server bully: ONLINE"
+        'Automatic server bully: ONLINE'
     )
 
     print(
-        "Animated roast cards: ONLINE"
+        'Animated roast cards: ONLINE'
     )
 
     print(
-        "=" * 60
+        '=' * 60
     )
 
     print()
 
-
-# ============================================================
-# COMMAND ERROR HANDLING
-# ============================================================
 
 @bot.event
 async def on_command_error(
@@ -2505,9 +2259,7 @@ async def on_command_error(
         error,
         commands.CommandNotFound
     ):
-
         return
-
 
     if isinstance(
         error,
@@ -2516,12 +2268,11 @@ async def on_command_error(
 
         await ctx.send(
             "☠️ You don't have permission "
-            "to fuck with that setting.",
+            'to fuck with that setting.',
             delete_after=8
         )
 
         return
-
 
     if isinstance(
         error,
@@ -2535,21 +2286,16 @@ async def on_command_error(
 
         return
 
-
     print(
-        f"Command error: "
-        f"{error}"
+        f'Command error: '
+        f'{error}'
     )
 
 
-# ============================================================
-# SLASH COMMAND: /setup
-# ============================================================
-
 @bot.tree.command(
-    name="setup",
+    name='setup',
     description=(
-        "Configure Nukem RoastBot for this server."
+        'Configure Nukem RoastBot for this server.'
     )
 )
 @app_commands.guild_only()
@@ -2563,7 +2309,7 @@ async def slash_setup(
     if not interaction.guild:
 
         await interaction.response.send_message(
-            "☠️ `/setup` only works inside a server.",
+            '☠️ `/setup` only works inside a server.',
             ephemeral=True
         )
 
@@ -2577,7 +2323,8 @@ async def slash_setup(
     ):
 
         await interaction.response.send_message(
-            "☠️ I couldn't verify your server permissions.",
+            "☠️ I couldn't verify your "
+            'server permissions.',
             ephemeral=True
         )
 
@@ -2586,8 +2333,8 @@ async def slash_setup(
     if not member.guild_permissions.manage_guild:
 
         await interaction.response.send_message(
-            "☠️ You need **Manage Server** permission "
-            "to run setup.",
+            '☠️ You need **Manage Server** permission '
+            'to run setup.',
             ephemeral=True
         )
 
@@ -2617,18 +2364,14 @@ async def slash_setup(
         setup_view.message = None
 
 
-# ============================================================
-# SLASH COMMAND: /roast
-# ============================================================
-
 @bot.tree.command(
-    name="roast",
-    description="Roast a specific member."
+    name='roast',
+    description='Roast a specific member.'
 )
 @app_commands.describe(
     member=(
-        "The unfortunate bastard "
-        "you want roasted."
+        'The unfortunate bastard '
+        'you want roasted.'
     )
 )
 async def slash_roast(
@@ -2640,15 +2383,13 @@ async def slash_roast(
 
         await interaction.response.send_message(
             "☠️ I'm not wasting a perfectly "
-            "good roast on a bot.",
+            'good roast on a bot.',
             ephemeral=True
         )
 
         return
 
-
     await interaction.response.defer()
-
 
     try:
 
@@ -2657,7 +2398,6 @@ async def slash_roast(
             interaction.guild.id
         )
 
-
         save_roast(
             interaction.guild.id,
             member.id,
@@ -2665,37 +2405,30 @@ async def slash_roast(
             roast
         )
 
-
         await send_roast_card_interaction(
             interaction,
             member,
             roast
         )
 
-
     except Exception as exc:
 
         print(
-            f"/roast error: "
-            f"{exc}"
+            f'/roast error: '
+            f'{exc}'
         )
 
         await interaction.followup.send(
-            "☠️ The roast machine caught fire. "
-            "Try again.",
+            '☠️ The roast machine caught fire. '
+            'Try again.',
             ephemeral=True
         )
 
 
-# ============================================================
-# SLASH COMMAND: /roastme
-# ============================================================
-
 @bot.tree.command(
-    name="roastme",
+    name='roastme',
     description=(
-        "Volunteer yourself "
-        "for psychological damage."
+        'Volunteer yourself for psychological damage.'
     )
 )
 async def slash_roastme(
@@ -2706,14 +2439,12 @@ async def slash_roastme(
 
     member = interaction.user
 
-
     try:
 
         roast = await generate_roast(
             member.display_name,
             interaction.guild.id
         )
-
 
         save_roast(
             interaction.guild.id,
@@ -2722,43 +2453,35 @@ async def slash_roastme(
             roast
         )
 
-
         await send_roast_card_interaction(
             interaction,
             member,
             roast
         )
 
-
     except Exception as exc:
 
         print(
-            f"/roastme error: "
-            f"{exc}"
+            f'/roastme error: '
+            f'{exc}'
         )
 
         await interaction.followup.send(
-            "☠️ The roast machine exploded. "
-            "Congratulations.",
+            '☠️ The roast machine exploded. '
+            'Congratulations.',
             ephemeral=True
         )
 
 
-# ============================================================
-# SLASH COMMAND: /roastchannel
-# ============================================================
-
 @bot.tree.command(
-    name="roastchannel",
+    name='roastchannel',
     description=(
-        "Set the channel where "
-        "automatic roasts happen."
+        'Set the channel where automatic roasts happen.'
     )
 )
 @app_commands.describe(
     channel=(
-        "The channel where the bot "
-        "should unleash hell."
+        'The channel where the bot should unleash hell.'
     )
 )
 @app_commands.checks.has_permissions(
@@ -2771,34 +2494,27 @@ async def slash_roastchannel(
 
     update_setting(
         interaction.guild.id,
-        "roast_channel_id",
+        'roast_channel_id',
         channel.id
     )
 
-
     await interaction.response.send_message(
-        f"☠️ Roast channel set to "
-        f"{channel.mention}. "
+        f'☠️ Roast channel set to '
+        f'{channel.mention}. '
         f"Someone's having a terrible "
-        f"fucking day soon."
+        f'fucking day soon.'
     )
 
 
-# ============================================================
-# SLASH COMMAND: /roastinterval
-# ============================================================
-
 @bot.tree.command(
-    name="roastinterval",
+    name='roastinterval',
     description=(
-        "Set how often the "
-        "automatic bully strikes."
+        'Set how often the automatic bully strikes.'
     )
 )
 @app_commands.describe(
     minutes=(
-        "Minutes between automatic "
-        "roast attempts."
+        'Minutes between automatic roast attempts.'
     )
 )
 @app_commands.checks.has_permissions(
@@ -2815,10 +2531,9 @@ async def slash_roastinterval(
 
     update_setting(
         interaction.guild.id,
-        "interval_minutes",
+        'interval_minutes',
         minutes
     )
-
 
     next_time = (
         datetime.now(
@@ -2829,34 +2544,27 @@ async def slash_roastinterval(
         )
     )
 
-
     update_setting(
         interaction.guild.id,
-        "next_roast_at",
+        'next_roast_at',
         next_time.isoformat()
     )
 
-
     await interaction.response.send_message(
-        f"☠️ Automatic bullying interval "
-        f"set to **{minutes} minute(s)**."
+        f'☠️ Automatic bullying interval set to '
+        f'**{minutes} minute(s)**.'
     )
 
 
-# ============================================================
-# SLASH COMMAND: /roastchance
-# ============================================================
-
 @bot.tree.command(
-    name="roastchance",
+    name='roastchance',
     description=(
-        "Set the percentage chance "
-        "of a roast firing."
+        'Set the percentage chance of a roast firing.'
     )
 )
 @app_commands.describe(
     chance=(
-        "Chance from 0 to 100 percent."
+        'Chance from 0 to 100 percent.'
     )
 )
 @app_commands.checks.has_permissions(
@@ -2873,32 +2581,25 @@ async def slash_roastchance(
 
     update_setting(
         interaction.guild.id,
-        "roast_chance",
+        'roast_chance',
         chance
     )
 
-
     await interaction.response.send_message(
-        f"☠️ Roast chance set to "
-        f"**{chance}%**."
+        f'☠️ Roast chance set to '
+        f'**{chance}%**.'
     )
 
 
-# ============================================================
-# SLASH COMMAND: /roastbully
-# ============================================================
-
 @bot.tree.command(
-    name="roastbully",
+    name='roastbully',
     description=(
-        "Turn automatic server "
-        "bullying on or off."
+        'Turn automatic server bullying on or off.'
     )
 )
 @app_commands.describe(
     enabled=(
-        "Whether automatic bullying "
-        "should be enabled."
+        'Whether automatic bullying should be enabled.'
     )
 )
 @app_commands.checks.has_permissions(
@@ -2911,10 +2612,13 @@ async def slash_roastbully(
 
     update_setting(
         interaction.guild.id,
-        "bully_enabled",
-        1 if enabled else 0
+        'bully_enabled',
+        (
+            1
+            if enabled
+            else 0
+        )
     )
-
 
     if enabled:
 
@@ -2924,7 +2628,7 @@ async def slash_roastbully(
 
         interval = int(
             settings[
-                "interval_minutes"
+                'interval_minutes'
             ]
         )
 
@@ -2939,37 +2643,31 @@ async def slash_roastbully(
 
         update_setting(
             interaction.guild.id,
-            "next_roast_at",
+            'next_roast_at',
             next_time.isoformat()
         )
 
         message = (
-            "☢️ **SERVER BULLY: ONLINE**\n"
-            "NukemLabs has resumed its bullshit."
+            '☢️ **SERVER BULLY: ONLINE**\n'
+            'NukemLabs has resumed its bullshit.'
         )
-
 
     else:
 
         message = (
-            "😇 **SERVER BULLY: OFFLINE**\n"
-            "Enjoy the peace while it lasts."
+            '😇 **SERVER BULLY: OFFLINE**\n'
+            'Enjoy the peace while it lasts.'
         )
-
 
     await interaction.response.send_message(
         message
     )
 
 
-# ============================================================
-# SLASH COMMAND: /roaststatus
-# ============================================================
-
 @bot.tree.command(
-    name="roaststatus",
+    name='roaststatus',
     description=(
-        "Show the current RoastBot settings."
+        'Show the current RoastBot settings.'
     )
 )
 async def slash_roaststatus(
@@ -2980,11 +2678,9 @@ async def slash_roaststatus(
         interaction.guild.id
     )
 
-
     channel_id = settings[
-        "roast_channel_id"
+        'roast_channel_id'
     ]
-
 
     if channel_id:
 
@@ -2997,105 +2693,88 @@ async def slash_roaststatus(
         channel_text = (
             channel.mention
             if channel
-            else f"<#{channel_id}>"
+            else f'<#{channel_id}>'
         )
-
 
     else:
 
         channel_text = (
-            "Not configured"
+            'Not configured'
         )
 
-
     bully_status = (
-        "☢️ ONLINE"
+        '☢️ ONLINE'
         if settings[
-            "bully_enabled"
+            'bully_enabled'
         ]
-        else "😇 OFFLINE"
+        else '😇 OFFLINE'
     )
 
-
     embed = discord.Embed(
-        title="☢️ NUKEM ROASTBOT",
+        title='☢️ NUKEM ROASTBOT',
         description=(
-            "**SERVER BULLY STATUS**"
+            '**SERVER BULLY STATUS**'
         ),
         color=NUKEM_YELLOW
     )
 
-
     embed.add_field(
-        name="Bully",
+        name='Bully',
         value=bully_status,
         inline=True
     )
 
-
     embed.add_field(
-        name="Interval",
+        name='Interval',
         value=(
-            f"{settings['interval_minutes']} "
-            f"minutes"
+            f"{settings['interval_minutes']} minutes"
         ),
         inline=True
     )
 
-
     embed.add_field(
-        name="Chance",
+        name='Chance',
         value=(
             f"{settings['roast_chance']}%"
         ),
         inline=True
     )
 
-
     embed.add_field(
-        name="User Cooldown",
+        name='User Cooldown',
         value=(
-            f"{settings['user_cooldown_minutes']} "
-            f"minutes"
+            f"{settings['user_cooldown_minutes']} minutes"
         ),
         inline=True
     )
 
-
     embed.add_field(
-        name="Roast Channel",
+        name='Roast Channel',
         value=channel_text,
         inline=True
     )
 
-
     embed.add_field(
-        name="Model",
+        name='Model',
         value=GEMINI_MODEL,
         inline=True
     )
 
-
     embed.set_footer(
         text=(
-            f"NukemLabs • "
-            f"We regret nothing. • "
-            f"v{VERSION}"
+            f'NukemLabs • '
+            f'We regret nothing. • '
+            f'v{VERSION}'
         )
     )
-
 
     await interaction.response.send_message(
         embed=embed
     )
 
 
-# ============================================================
-# PREFIX COMMAND: !roast
-# ============================================================
-
 @bot.command(
-    name="roast"
+    name='roast'
 )
 async def prefix_roast(
     ctx,
@@ -3105,24 +2784,22 @@ async def prefix_roast(
     if member is None:
 
         await ctx.send(
-            "☠️ Tag someone, genius. "
-            "`!roast @person`",
+            '☠️ Tag someone, genius. '
+            '`!roast @person`',
             delete_after=8
         )
 
         return
-
 
     if member.bot:
 
         await ctx.send(
             "☠️ I'm not wasting a perfectly "
-            "good roast on a bot.",
+            'good roast on a bot.',
             delete_after=8
         )
 
         return
-
 
     try:
 
@@ -3131,7 +2808,6 @@ async def prefix_roast(
             ctx.guild.id
         )
 
-
         save_roast(
             ctx.guild.id,
             member.id,
@@ -3139,28 +2815,22 @@ async def prefix_roast(
             roast
         )
 
-
         await send_roast_card_ctx(
             ctx,
             member,
             roast
         )
 
-
     except Exception as exc:
 
         print(
-            f"!roast error: "
-            f"{exc}"
+            f'!roast error: '
+            f'{exc}'
         )
 
 
-# ============================================================
-# PREFIX COMMAND: !roastme
-# ============================================================
-
 @bot.command(
-    name="roastme"
+    name='roastme'
 )
 async def prefix_roastme(
     ctx
@@ -3168,14 +2838,12 @@ async def prefix_roastme(
 
     member = ctx.author
 
-
     try:
 
         roast = await generate_roast(
             member.display_name,
             ctx.guild.id
         )
-
 
         save_roast(
             ctx.guild.id,
@@ -3184,28 +2852,22 @@ async def prefix_roastme(
             roast
         )
 
-
         await send_roast_card_ctx(
             ctx,
             member,
             roast
         )
 
-
     except Exception as exc:
 
         print(
-            f"!roastme error: "
-            f"{exc}"
+            f'!roastme error: '
+            f'{exc}'
         )
 
 
-# ============================================================
-# PREFIX COMMAND: !roastchannel
-# ============================================================
-
 @bot.command(
-    name="roastchannel"
+    name='roastchannel'
 )
 @commands.has_permissions(
     manage_guild=True
@@ -3219,28 +2881,22 @@ async def prefix_roastchannel(
 
         channel = ctx.channel
 
-
     update_setting(
         ctx.guild.id,
-        "roast_channel_id",
+        'roast_channel_id',
         channel.id
     )
 
-
     await ctx.send(
-        f"☠️ Roast channel set to "
-        f"{channel.mention}. "
+        f'☠️ Roast channel set to '
+        f'{channel.mention}. '
         f"Someone's about to have a "
-        f"fucking bad evening."
+        f'fucking bad evening.'
     )
 
 
-# ============================================================
-# PREFIX COMMAND: !roastinterval
-# ============================================================
-
 @bot.command(
-    name="roastinterval"
+    name='roastinterval'
 )
 @commands.has_permissions(
     manage_guild=True
@@ -3253,13 +2909,12 @@ async def prefix_roastinterval(
     if minutes is None:
 
         await ctx.send(
-            "☠️ Usage: "
-            "`!roastinterval 10`",
+            '☠️ Usage: '
+            '`!roastinterval 10`',
             delete_after=8
         )
 
         return
-
 
     if (
         minutes < 1
@@ -3267,20 +2922,18 @@ async def prefix_roastinterval(
     ):
 
         await ctx.send(
-            "☠️ Pick something between "
-            "1 and 1440 minutes.",
+            '☠️ Pick something between '
+            '1 and 1440 minutes.',
             delete_after=8
         )
 
         return
 
-
     update_setting(
         ctx.guild.id,
-        "interval_minutes",
+        'interval_minutes',
         minutes
     )
-
 
     next_time = (
         datetime.now(
@@ -3291,26 +2944,20 @@ async def prefix_roastinterval(
         )
     )
 
-
     update_setting(
         ctx.guild.id,
-        "next_roast_at",
+        'next_roast_at',
         next_time.isoformat()
     )
 
-
     await ctx.send(
-        f"☠️ Automatic bullying interval "
-        f"set to **{minutes} minute(s)**."
+        f'☠️ Automatic bullying interval set to '
+        f'**{minutes} minute(s)**.'
     )
 
 
-# ============================================================
-# PREFIX COMMAND: !roastchance
-# ============================================================
-
 @bot.command(
-    name="roastchance"
+    name='roastchance'
 )
 @commands.has_permissions(
     manage_guild=True
@@ -3323,13 +2970,12 @@ async def prefix_roastchance(
     if chance is None:
 
         await ctx.send(
-            "☠️ Usage: "
-            "`!roastchance 100`",
+            '☠️ Usage: '
+            '`!roastchance 100`',
             delete_after=8
         )
 
         return
-
 
     if (
         chance < 0
@@ -3337,33 +2983,27 @@ async def prefix_roastchance(
     ):
 
         await ctx.send(
-            "☠️ Chance has to be between "
-            "0 and 100.",
+            '☠️ Chance has to be between '
+            '0 and 100.',
             delete_after=8
         )
 
         return
 
-
     update_setting(
         ctx.guild.id,
-        "roast_chance",
+        'roast_chance',
         chance
     )
 
-
     await ctx.send(
-        f"☠️ Roast chance set to "
-        f"**{chance}%**."
+        f'☠️ Roast chance set to '
+        f'**{chance}%**.'
     )
 
 
-# ============================================================
-# PREFIX COMMAND: !roastbully
-# ============================================================
-
 @bot.command(
-    name="roastbully"
+    name='roastbully'
 )
 @commands.has_permissions(
     manage_guild=True
@@ -3376,54 +3016,51 @@ async def prefix_roastbully(
     if state is None:
 
         await ctx.send(
-            "☠️ Usage: "
-            "`!roastbully on` "
-            "or `!roastbully off`",
+            '☠️ Usage: '
+            '`!roastbully on` '
+            'or `!roastbully off`',
             delete_after=8
         )
 
         return
-
 
     state = state.lower()
 
-
     if state not in (
-        "on",
-        "off"
+        'on',
+        'off'
     ):
 
         await ctx.send(
-            "☠️ Use `on` or `off`.",
+            '☠️ Use `on` or `off`.',
             delete_after=8
         )
 
         return
 
-
     enabled = (
-        state == "on"
+        state == 'on'
     )
-
 
     update_setting(
         ctx.guild.id,
-        "bully_enabled",
-        1 if enabled else 0
+        'bully_enabled',
+        (
+            1
+            if enabled
+            else 0
+        )
     )
-
 
     if enabled:
 
-        settings = (
-            get_guild_settings(
-                ctx.guild.id
-            )
+        settings = get_guild_settings(
+            ctx.guild.id
         )
 
         interval = int(
             settings[
-                "interval_minutes"
+                'interval_minutes'
             ]
         )
 
@@ -3438,31 +3075,25 @@ async def prefix_roastbully(
 
         update_setting(
             ctx.guild.id,
-            "next_roast_at",
+            'next_roast_at',
             next_time.isoformat()
         )
 
-
         await ctx.send(
-            "☢️ **SERVER BULLY: ONLINE**\n"
-            "NukemLabs has resumed its bullshit."
+            '☢️ **SERVER BULLY: ONLINE**\n'
+            'NukemLabs has resumed its bullshit.'
         )
-
 
     else:
 
         await ctx.send(
-            "😇 **SERVER BULLY: OFFLINE**\n"
-            "Enjoy the peace while it lasts."
+            '😇 **SERVER BULLY: OFFLINE**\n'
+            'Enjoy the peace while it lasts.'
         )
 
 
-# ============================================================
-# PREFIX COMMAND: !roaststatus
-# ============================================================
-
 @bot.command(
-    name="roaststatus"
+    name='roaststatus'
 )
 async def prefix_roaststatus(
     ctx
@@ -3472,128 +3103,107 @@ async def prefix_roaststatus(
         ctx.guild.id
     )
 
-
     channel_id = settings[
-        "roast_channel_id"
+        'roast_channel_id'
     ]
-
 
     if channel_id:
 
-        channel = (
-            ctx.guild.get_channel(
-                channel_id
-            )
+        channel = ctx.guild.get_channel(
+            channel_id
         )
 
         channel_text = (
             channel.mention
             if channel
-            else f"<#{channel_id}>"
+            else f'<#{channel_id}>'
         )
-
 
     else:
 
         channel_text = (
-            "Not configured"
+            'Not configured'
         )
 
-
     bully_status = (
-        "☢️ ONLINE"
+        '☢️ ONLINE'
         if settings[
-            "bully_enabled"
+            'bully_enabled'
         ]
-        else "😇 OFFLINE"
+        else '😇 OFFLINE'
     )
 
-
     embed = discord.Embed(
-        title="☢️ NUKEM ROASTBOT",
+        title='☢️ NUKEM ROASTBOT',
         description=(
-            "**SERVER BULLY STATUS**"
+            '**SERVER BULLY STATUS**'
         ),
         color=NUKEM_YELLOW
     )
 
-
     embed.add_field(
-        name="Bully",
+        name='Bully',
         value=bully_status,
         inline=True
     )
 
-
     embed.add_field(
-        name="Interval",
+        name='Interval',
         value=(
-            f"{settings['interval_minutes']} "
-            f"minutes"
+            f"{settings['interval_minutes']} minutes"
         ),
         inline=True
     )
 
-
     embed.add_field(
-        name="Chance",
+        name='Chance',
         value=(
             f"{settings['roast_chance']}%"
         ),
         inline=True
     )
 
-
     embed.add_field(
-        name="User Cooldown",
+        name='User Cooldown',
         value=(
-            f"{settings['user_cooldown_minutes']} "
-            f"minutes"
+            f"{settings['user_cooldown_minutes']} minutes"
         ),
         inline=True
     )
 
-
     embed.add_field(
-        name="Roast Channel",
+        name='Roast Channel',
         value=channel_text,
         inline=True
     )
 
-
     embed.add_field(
-        name="Model",
+        name='Model',
         value=GEMINI_MODEL,
         inline=True
     )
 
-
     embed.set_footer(
         text=(
-            f"NukemLabs • "
-            f"We regret nothing. • "
-            f"v{VERSION}"
+            f'NukemLabs • '
+            f'We regret nothing. • '
+            f'v{VERSION}'
         )
     )
-
 
     await ctx.send(
         embed=embed
     )
 
 
-# ============================================================
-# STARTUP
-# ============================================================
-
-if __name__ == "__main__":
+if __name__ == '__main__':
 
     init_database()
 
     print()
 
     print(
-        "Starting Nukem RoastBot 4.6..."
+        'Starting Nukem RoastBot 4.6.1...'
     )
 
     print()
