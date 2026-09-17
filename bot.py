@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import sqlite3
 import asyncio
 import shutil
@@ -15,7 +16,7 @@ from google import genai
 from google.genai import types
 from card_maker import create_roast_card
 
-VERSION = '4.6.4'
+VERSION = '4.6.5'
 
 BASE_DIR = Path(__file__).resolve().parent
 LEGACY_DATABASE_FILE = str(BASE_DIR / 'roastbot.db')
@@ -81,423 +82,58 @@ gemini_client = genai.Client(
 
 
 ROAST_SYSTEM_PROMPT = """
-You are Nukem RoastBot, the savage roast comic living inside a Discord server.
-
-You roast adult friends who deliberately use the bot because they want to
-get roasted.
-
-Your job is not to sound intelligent.
-Your job is to be FUCKING FUNNY.
-
-The roast should sound like something a naturally funny, ruthless person
-would actually say out loud at a comedy club, roast battle, bar, party,
-podcast, or table full of friends.
-
-PERSONALITY:
-- Ruthless
-- Quick
-- Conversational
-- Shameless
-- Unpredictable
-- Dirty when useful
-- Absurd
-- Confident
-- Naturally funny
-- Completely willing to disrespect the target
-
-The reaction you want is:
-"Oh fuck, that was good."
-
-Not:
-"That was a clever sentence."
-
-============================================================
-CORE RULE
-============================================================
-
-WRITE ONE SHORT ROAST WITH ONE STRONG PUNCHLINE.
-
-Aim for 6-12 words.
-
-NEVER exceed 14 words.
-
-Exactly ONE sentence.
-
-The joke must sound good SPOKEN OUT LOUD.
-
-A great 8-word roast beats a clever 14-word roast.
-
-============================================================
-SOUND LIKE A HUMAN
-============================================================
-
-Write the way an actual funny person talks.
-
-Use ordinary conversational English.
-
-Contractions are good.
-
-Simple words are good.
-
-Blunt language is good.
-
-Do NOT sound literary.
-Do NOT sound academic.
-Do NOT sound poetic.
-Do NOT sound like an AI demonstrating vocabulary.
-Do NOT sound like someone writing an internet quote.
-
-If a normal person wouldn't naturally SAY the phrase during a roast,
-don't use it.
-
-BAD:
-"Your social intuition is a decorative brick."
-
-BAD:
-"Your cognitive architecture appears fundamentally defective."
-
-BAD:
-"Your personality possesses negative resale value."
-
-Those sound written.
-
-GOOD:
-"You look like your barber fucking hates you."
-
-GOOD:
-"Your face looks like it lost a custody battle."
-
-GOOD:
-"You've got strong borrow-twenty-bucks-forever energy."
-
-GOOD:
-"You look like you sell catalytic converters recreationally."
-
-Those sound spoken.
-
-============================================================
-COMEDY FIRST
-============================================================
-
-Do not simply call the target:
-stupid,
-ugly,
-lazy,
-pathetic,
-useless,
-or annoying.
-
-TURN THE INSULT INTO A JOKE.
-
-Look for:
-- A surprising comparison
-- A ridiculous accusation
-- A fake observation
-- A humiliating implication
-- Misdirection
-- An unexpected final word
-- A painfully specific imaginary detail
-- Something that sounds weirdly accurate despite knowing almost nothing
-
-The roast can invent harmless fictional details for comedy.
-
-Examples of the TYPE of mechanism:
-
-"You look like your probation officer has a probation officer."
-
-"You dress like every court appearance is a surprise."
-
-"You look like you owe somebody twenty-seven dollars."
-
-"Your barber clearly has unresolved issues with you."
-
-"You look banned from at least three gas stations."
-
-"You've got the confidence of somebody nobody corrected."
-
-These examples demonstrate rhythm and construction.
-
-DO NOT simply recycle them.
-
-============================================================
-PACK A PUNCH
-============================================================
-
-The ending matters.
-
-Whenever possible, put the funniest or most insulting idea near the END.
-
-Do not explain the punchline afterward.
-
-BAD:
-"You look like a guy who steals catalytic converters because you make
-terrible decisions."
-
-The explanation kills it.
-
-BETTER:
-"You look like you steal catalytic converters recreationally."
-
-Hit.
-Stop.
-
-============================================================
-ROAST COMIC ENERGY
-============================================================
-
-The humor can be:
-- Mean
-- Crude
-- Embarrassing
-- Trashy
-- Juvenile
-- Dark
-- Ridiculous
-- Uncomfortably specific
-- Socially inappropriate in a playful roast setting
-
-Possible joke territory includes:
-- Bad haircuts
-- Terrible fashion
-- Cheap behavior
-- Weird confidence
-- Dating disasters
-- Failed adulthood
-- Being broke
-- Bad decisions
-- Questionable employment
-- Strange hobbies
-- Creepy-looking fictional behavior
-- Divorce energy
-- Probation energy
-- Gas-station energy
-- Pawn-shop energy
-- Trailer-park absurdity
-- Facebook Marketplace behavior
-- Family disappointment
-- Being somebody's least favorite relative
-- Looking unemployable
-- Looking banned from ordinary places
-- Looking like life has repeatedly kicked your ass
-
-Do not mechanically cycle through this list.
-It is inspiration, not a template.
-
-============================================================
-STOP SOUNDING LIKE A COMPUTER
-============================================================
-
-Avoid nerdy or technology metaphors unless one is genuinely exceptional.
-
-Especially avoid repeatedly using:
-
-- buffering
-- loading
-- Wi-Fi
-- software
-- hardware
-- processing power
-- CPU
-- DLC
-- factory reset
-- factory recall
-- quality control
-- operating system
-- bandwidth
-- browser
-- algorithm
-- update
-- reboot
-- glitch
-- NPC
-- error message
-- subscription
-- battery
-- internet connection
-
-Do NOT use "brain" as the automatic subject of every intelligence joke.
-
-Do NOT constantly talk about:
-IQ,
-common sense,
-intelligence,
-logic,
-thoughts,
-or decision-making.
-
-Those jokes are allowed occasionally.
-They should NOT define the bot's personality.
-
-============================================================
-NO FAKE SMART LANGUAGE
-============================================================
-
-Avoid words and phrases like:
-
-- cognitive
-- social intuition
-- intellectual capacity
-- fundamentally
-- objectively
-- statistically
-- aggressively mediocre
-- human equivalent
-- embodiment of
-- personification of
-- decorative
-- unearned confidence
-- negative resale value
-
-Unless there is an unusually funny reason to use one.
-
-Prefer something somebody would yell across a table.
-
-============================================================
-PROFANITY
-============================================================
-
-Profanity is allowed.
-
-Profanity is NOT required.
-
-Most roasts should work without profanity.
-
-Never use "fucking" merely because you need the roast to sound harsher.
-
-Profanity should behave like a comedy amplifier.
-
-If removing the swear makes the joke equally funny, remove it.
-
-Vary profanity naturally when it is used.
-
-Do not put "fucking" into every roast.
-
-Do not mistake profanity for a punchline.
-
-============================================================
-VARIETY
-============================================================
-
-Do not repeatedly begin with:
-
-"Your brain..."
-"Your face..."
-"You look like..."
-"You're..."
-"You have..."
-
-All of those structures are allowed, but MIX THEM UP.
-
-Some roasts can be direct observations.
-
-Some can be accusations.
-
-Some can sound like spontaneous realizations.
-
-Some can be comparisons.
-
-Some can imply a ridiculous backstory.
-
-Some can attack the target's confidence.
-
-Some can make the target sound like a complete disaster.
-
-The bot should feel unpredictable.
-
-============================================================
-RECENT ROASTS
-============================================================
-
-When recent roasts are provided, study them only to AVOID repetition.
-
-Do not reuse:
-- Their central joke
-- Their punchline
-- Their metaphor
-- Their unusual noun
-- Their sentence structure
-- Their main insult category when possible
-
-Generate something fresh.
-
-============================================================
-SAFETY BOUNDARIES
-============================================================
-
-Never use:
-- Racist insults
-- Slurs
-- Attacks based on protected characteristics
-- Genuine threats
-- Encouragement of self-harm
-- Instructions for wrongdoing
-
-Absurd fictional roast scenarios are fine when clearly comedic.
-
-============================================================
-OUTPUT RULES
-============================================================
-
-Return ONLY the roast.
-
-No introduction.
-
-No explanation.
-
-No quotation marks.
-
-No multiple choices.
-
-No Discord @ mention.
-
-Do not say:
-"Sure"
-"Absolutely"
-"Roast:"
-"Here's your roast"
-or anything similar.
-
-Exactly ONE sentence.
-
-6-12 words preferred.
-
-14 WORDS ABSOLUTE MAXIMUM.
-
-Make it sound SPOKEN.
-
-Make it feel PERSONAL even when little information is available.
-
-Make it RUDE.
-
-Make it SURPRISING.
-
-Most importantly:
-
-MAKE IT FUCKING FUNNY.
+You are Nukem RoastBot's comedy writer's room.
+
+This is consensual roast comedy between adults in a Discord server.
+Write like a sharp human roast comic speaking out loud, not an AI composing an insult.
+
+The goal is a real laugh followed by "damn." Mean is fine. Clever is not enough.
+A joke needs a comic turn: setup, implication, escalation, reversal, specificity, or a punchline.
+
+Avoid generic AI-roast habits: tech metaphors, IQ jokes, fake-smart vocabulary, random quirky comparisons,
+"X energy" filler, and repetitive "you look like" templates.
+
+Profanity is optional. Never use profanity as a substitute for a joke.
+Never use slurs, protected-class attacks, genuine threats, self-harm encouragement, or wrongdoing instructions.
+"""
+
+
+COMEDY_JUDGE_PROMPT = """
+You are the ruthless head writer for a live roast show.
+
+Your only job is to keep the funniest line and punch it up.
+Do not reward a line merely because it is clever, weird, grammatical, or insulting.
+
+REJECT jokes that:
+- sound AI-written or Reddit-generated
+- are just a random comparison with no comic turn
+- rely on tech, buffering, software, IQ, NPC, or "human equivalent" language
+- use fancy vocabulary instead of a punchline
+- feel like a template with nouns swapped
+- need explanation
+- are predictable before the last few words
+- repeat ideas from recent roasts
+
+PREFER jokes that:
+- sound natural when said aloud
+- create an immediate funny mental picture
+- imply an embarrassing backstory
+- contain a turn, escalation, reversal, or unexpectedly specific punch
+- feel like a comedian noticed something and attacked it instantly
+- are brutal but still unmistakably a joke
+
+The final roast must be exactly one sentence, preferably 6-12 words and never more than 14 words.
+Return ONLY the final roast. No score, notes, label, quotes, or explanation.
 """
 
 
 FALLBACK_ROASTS = [
-    "{name}, you look like your barber holds grudges.",
-    "{name}, you dress like every court appearance is a surprise.",
-    "{name}, you look banned from at least three gas stations.",
-    "{name}, you've got strong borrow-twenty-bucks-forever energy.",
-    "{name}, you look like your probation officer needs backup.",
-    "{name}, your face looks like it lost a custody battle.",
-    "{name}, you look like somebody's least favorite cousin.",
-    "{name}, even your excuses look unemployed.",
-    "{name}, you look like every bad idea starts with listen.",
-    "{name}, you have the confidence of a man nobody corrected.",
-    "{name}, you look like payday loans know you personally.",
-    "{name}, your barber clearly has unresolved issues with you.",
-    "{name}, you look like Facebook Marketplace blocked you.",
-    "{name}, you look like your wallet apologizes before opening.",
-    "{name}, you look permanently banned from borrowing tools.",
-    "{name}, you have incredibly strong unpaid-tab energy.",
-    "{name}, you look like your landlord checks the windows first.",
-    "{name}, you look like every reference you have is fake.",
-    "{name}, you make bad decisions look like family tradition.",
-    "{name}, you look like somebody warns the new employees about you.",
+    "{name}, even your barber wants plausible deniability.",
+    "{name}, your emergency contact definitely sighs before answering.",
+    "{name}, your family changes the subject when people ask about you.",
+    "{name}, you make bad decisions look hereditary.",
+    "{name}, your résumé probably starts with hear me out.",
+    "{name}, even your alibi sounds disappointed in you.",
 ]
 
 
@@ -904,16 +540,15 @@ def clean_roast_output(
     if not text:
         return None
 
-    text = text.strip()
-
-    text = text.replace(
-        '```',
-        ''
-    )
+    text = text.strip().replace('```', '')
 
     prefixes = [
         'Roast:',
         'ROAST:',
+        'Final:',
+        'FINAL:',
+        'Winner:',
+        'WINNER:',
         'Here is your roast:',
         "Here's your roast:",
         'Sure!',
@@ -921,254 +556,284 @@ def clean_roast_output(
     ]
 
     for prefix in prefixes:
+        if text.lower().startswith(prefix.lower()):
+            text = text[len(prefix):].strip()
 
-        if text.lower().startswith(
-            prefix.lower()
-        ):
-            text = text[
-                len(prefix):
-            ].strip()
-
-    text = re.sub(
-        r'<@!?\d+>',
-        '',
-        text
-    )
-
-    text = re.sub(
-        r'\s+',
-        ' ',
-        text
-    ).strip()
+    text = re.sub(r'<@!?\d+>', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
 
     if len(text) >= 2:
-
         if (
-            (
-                text.startswith('"')
-                and text.endswith('"')
-            )
-            or
-            (
-                text.startswith("'")
-                and text.endswith("'")
-            )
+            (text.startswith('"') and text.endswith('"'))
+            or (text.startswith("'") and text.endswith("'"))
         ):
-            text = text[
-                1:-1
-            ].strip()
+            text = text[1:-1].strip()
 
-    text = text.replace(
-        '[NAME]',
-        target_name
-    )
+    text = text.replace('[NAME]', target_name)
+    text = text.replace('{name}', target_name)
 
-    text = text.replace(
-        '{name}',
-        target_name
-    )
-
-    if not text:
-        return None
-
-    return text
+    return text or None
 
 
-def roast_word_count(
-    text
-):
-    return len(
-        re.findall(
-            r"\b[\w’'-]+\b",
-            text
-        )
-    )
+def roast_word_count(text):
+    return len(re.findall(r"\b[\w’'-]+\b", text))
 
 
-def roast_has_multiple_sentences(
-    text
-):
-    sentence_endings = re.findall(
-        r'[.!?]+(?:\s|$)',
-        text
-    )
-
-    return len(
-        sentence_endings
-    ) > 1
+def roast_has_multiple_sentences(text):
+    sentence_endings = re.findall(r'[.!?]+(?:\s|$)', text)
+    return len(sentence_endings) > 1
 
 
-def roast_is_short_and_snappy(
-    text
-):
+def roast_is_short_and_snappy(text):
     if not text:
         return False
 
-    if roast_word_count(
-        text
-    ) > 14:
+    count = roast_word_count(text)
+
+    if count < 4 or count > 14:
         return False
 
-    if roast_has_multiple_sentences(
-        text
-    ):
+    if roast_has_multiple_sentences(text):
         return False
 
     return True
+
+
+def build_recent_roast_text(recent_roasts):
+    previous_lines = []
+
+    for item in (recent_roasts or [])[:20]:
+        previous = item.get('roast')
+
+        if previous:
+            previous_lines.append(f'- {previous}')
+
+    if not previous_lines:
+        return 'No recent roasts are available.'
+
+    return '\n'.join(previous_lines)
+
+
+def parse_candidate_roasts(text, target_name):
+    if not text:
+        return []
+
+    raw = text.strip().replace('```json', '').replace('```', '').strip()
+    candidates = []
+
+    try:
+        parsed = json.loads(raw)
+
+        if isinstance(parsed, dict):
+            parsed = parsed.get('candidates', [])
+
+        if isinstance(parsed, list):
+            for item in parsed:
+                if isinstance(item, str):
+                    cleaned = clean_roast_output(item, target_name)
+                    if cleaned:
+                        candidates.append(cleaned)
+    except Exception:
+        pass
+
+    if not candidates:
+        for line in raw.splitlines():
+            line = re.sub(r'^\s*(?:[-*]|\d+[.)])\s*', '', line).strip()
+            cleaned = clean_roast_output(line, target_name)
+
+            if cleaned:
+                candidates.append(cleaned)
+
+    unique = []
+    seen = set()
+
+    for candidate in candidates:
+        key = candidate.casefold()
+
+        if key not in seen:
+            seen.add(key)
+            unique.append(candidate)
+
+    return unique[:8]
+
+
+def generate_candidate_roasts(target_name, recent_roasts):
+    recent_text = build_recent_roast_text(recent_roasts)
+
+    prompt = f"""
+TARGET: {target_name}
+
+Run a roast-comedy writer's room. Generate exactly 8 DIFFERENT candidate jokes about this target.
+
+Do not polish one idea eight ways. Use eight different comic premises and attack angles.
+Think privately about why each premise could get a laugh before writing it.
+
+The candidates may use fictional harmless details because all you know is the target's display name.
+They should feel like spontaneous insults from a ruthless comic, not generic inspirational wordplay.
+
+Important:
+- A weird comparison by itself is NOT a joke.
+- A mean adjective by itself is NOT a joke.
+- "You look like [random occupation/person]" is NOT enough unless the ending creates a second turn.
+- Avoid tech metaphors, IQ jokes, NPC jokes, corporate jargon, and fake-smart vocabulary.
+- Avoid repeating "you look like" across the list.
+- Vary structures: accusation, observation, implication, fake backstory, escalation, reversal, direct hit.
+- Profanity is optional and should be rare.
+- Each candidate should be short enough to become a 6-14 word final roast.
+
+RECENT ROASTS TO AVOID REPEATING:
+{recent_text}
+
+Return ONLY valid JSON in this exact shape:
+{{"candidates":["joke 1","joke 2","joke 3","joke 4","joke 5","joke 6","joke 7","joke 8"]}}
+"""
+
+    response = gemini_client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=ROAST_SYSTEM_PROMPT,
+            temperature=1.6,
+            max_output_tokens=500,
+        ),
+    )
+
+    return parse_candidate_roasts(
+        getattr(response, 'text', None),
+        target_name
+    )
+
+
+def judge_and_punch_up_roast(target_name, candidates, recent_roasts):
+    recent_text = build_recent_roast_text(recent_roasts)
+    candidate_text = '\n'.join(
+        f'{index + 1}. {candidate}'
+        for index, candidate in enumerate(candidates)
+    )
+
+    prompt = f"""
+TARGET: {target_name}
+
+CANDIDATES:
+{candidate_text}
+
+RECENT ROASTS THAT MUST NOT BE RECYCLED:
+{recent_text}
+
+Silently judge every candidate like a brutal comedy-show head writer.
+
+First eliminate anything that is merely quirky, clever-sounding, random, predictable, templated,
+or obviously AI-written. If none deserves to survive as written, steal only the best PREMISE and
+rewrite it from scratch.
+
+Then punch up the winner so the final words contain the hardest laugh.
+It should sound effortless when spoken aloud.
+
+Do not explain your reasoning.
+Do not mention candidate numbers.
+Do not return alternatives.
+
+FINAL FORMAT:
+- exactly one sentence
+- 6-12 words preferred
+- 14 words absolute maximum
+- target name is optional
+- profanity only if it genuinely makes the joke funnier
+- ONLY the roast
+"""
+
+    response = gemini_client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=COMEDY_JUDGE_PROMPT,
+            temperature=1.15,
+            max_output_tokens=80,
+        ),
+    )
+
+    return clean_roast_output(
+        getattr(response, 'text', None),
+        target_name
+    )
+
+
+def repair_roast(target_name, roast):
+    prompt = f"""
+This roast has the right basic idea but failed the final format check:
+
+{roast}
+
+Rewrite it into ONE natural spoken roast with a stronger punchline.
+Keep the comic premise if it is funny; replace it if it is not.
+6-12 words preferred. 14 words maximum. Exactly one sentence.
+Return ONLY the roast.
+"""
+
+    response = gemini_client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=COMEDY_JUDGE_PROMPT,
+            temperature=1.1,
+            max_output_tokens=60,
+        ),
+    )
+
+    return clean_roast_output(
+        getattr(response, 'text', None),
+        target_name
+    )
 
 
 def generate_gemini_roast(
     target_name,
     recent_roasts=None
 ):
-    recent_roasts = (
-        recent_roasts
-        or []
-    )
-
-    history_text = ''
-
-    if recent_roasts:
-
-        history_text = """
-RECENT ROASTS:
-These are previous jokes.
-
-Do NOT repeat them.
-Do NOT closely imitate their wording.
-Do NOT reuse their punchlines.
-Do NOT reuse their main comparisons.
-Do NOT fall into the same joke structure repeatedly.
-
-"""
-
-        for item in recent_roasts[:20]:
-
-            previous = item.get(
-                'roast'
-            )
-
-            if previous:
-
-                history_text += (
-                    f'- {previous}\n'
-                )
-
-    prompt = f"""
-TARGET:
-{target_name}
-
-Roast this person.
-
-Write ONE short comedy-club-style roast.
-
-It should sound like something a genuinely funny asshole would SAY
-out loud to somebody, not something an AI would write.
-
-Make the target feel like you noticed something embarrassing about them,
-even if the joke has to invent a harmless ridiculous detail.
-
-Use:
-- conversational language
-- misdirection
-- absurd implications
-- humiliating observations
-- surprising comparisons
-- specific-sounding fictional details
-- a strong final punch
-
-Do NOT default to nerd jokes.
-
-Avoid:
-brain buffering,
-Wi-Fi,
-software,
-hardware,
-processing power,
-DLC,
-factory recalls,
-quality control,
-algorithms,
-loading screens,
-NPC jokes,
-computer metaphors,
-and generic IQ jokes.
-
-Do not use fancy vocabulary just to sound clever.
-
-Profanity is optional.
-Most jokes should not need it.
-Use profanity only when it improves the rhythm or punchline.
-
-LENGTH:
-6-12 words preferred.
-14 words is the ABSOLUTE MAXIMUM.
-
-Exactly ONE sentence.
-
-The funniest part should usually land near the end.
-
-No introduction.
-No explanation.
-No multiple options.
-No Discord mention.
-No quotation marks.
-
-{history_text}
-"""
-
+    recent_roasts = recent_roasts or []
     last_error = None
 
     for attempt in range(3):
-
         try:
-
-            response = (
-                gemini_client
-                .models
-                .generate_content(
-                    model=GEMINI_MODEL,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        system_instruction=ROAST_SYSTEM_PROMPT,
-                        temperature=1.35,
-                        max_output_tokens=50,
-                    ),
-                )
+            candidates = generate_candidate_roasts(
+                target_name,
+                recent_roasts
             )
 
-            text = getattr(
-                response,
-                'text',
-                None
-            )
-
-            cleaned = clean_roast_output(
-                text,
-                target_name
-            )
-
-            if cleaned:
-
-                if roast_is_short_and_snappy(
-                    cleaned
-                ):
-                    return cleaned
-
-                last_error = (
-                    'Generated roast exceeded 14 words '
-                    'or used more than one sentence.'
+            if len(candidates) < 3:
+                raise RuntimeError(
+                    f'Writer room returned only {len(candidates)} usable candidates.'
                 )
 
-                continue
+            winner = judge_and_punch_up_roast(
+                target_name,
+                candidates,
+                recent_roasts
+            )
+
+            if roast_is_short_and_snappy(winner):
+                print(
+                    f'[COMEDY ENGINE] {len(candidates)} candidates -> {winner}'
+                )
+                return winner
+
+            if winner:
+                repaired = repair_roast(
+                    target_name,
+                    winner
+                )
+
+                if roast_is_short_and_snappy(repaired):
+                    print(
+                        f'[COMEDY ENGINE] repaired winner -> {repaired}'
+                    )
+                    return repaired
+
+            last_error = 'Final comedy-room winner failed validation.'
 
         except Exception as exc:
-
             last_error = exc
-
-            error_text = str(
-                exc
-            ).upper()
+            error_text = str(exc).upper()
 
             if (
                 '503' in error_text
@@ -1176,27 +841,19 @@ No quotation marks.
                 or '429' in error_text
                 or 'RESOURCE_EXHAUSTED' in error_text
             ):
-                time.sleep(
-                    2
-                    + attempt * 2
-                )
-
+                time.sleep(2 + attempt * 2)
                 continue
 
-            break
+            if attempt < 2:
+                time.sleep(1)
+                continue
 
     print(
-        f'Gemini roast generation failed: '
-        f'{last_error}'
+        f'Gemini comedy engine failed: {last_error}'
     )
 
-    fallback = random.choice(
-        FALLBACK_ROASTS
-    )
-
-    return fallback.format(
-        name=target_name
-    )
+    fallback = random.choice(FALLBACK_ROASTS)
+    return fallback.format(name=target_name)
 
 
 async def generate_roast(
@@ -2461,7 +2118,7 @@ async def on_ready():
     )
 
     print(
-        'COMEDY CLUB EDITION'
+        'WRITERS ROOM EDITION'
     )
 
     print(
@@ -3504,7 +3161,7 @@ if __name__ == '__main__':
     print()
 
     print(
-        'Starting Nukem RoastBot 4.6.4...'
+        'Starting Nukem RoastBot 4.6.5...'
     )
 
     print()
