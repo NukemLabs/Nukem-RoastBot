@@ -16,7 +16,7 @@ from google import genai
 from google.genai import types
 from card_maker import create_roast_card
 
-VERSION = '4.6.6'
+VERSION = '4.6.7'
 
 BASE_DIR = Path(__file__).resolve().parent
 LEGACY_DATABASE_FILE = str(BASE_DIR / 'roastbot.db')
@@ -82,29 +82,41 @@ gemini_client = genai.Client(
 
 
 ROAST_SYSTEM_PROMPT = """
-You are Nukem RoastBot's savage adult roast writer.
+You are Nukem RoastBot's no-mercy adult roast writer.
 
 This is consensual roast comedy between adults in a Discord server.
-Your job is to write SHORT, BRUTAL, FUNNY kill-shots that sound like a real person said them out loud.
+Write SHORT, BRUTAL, FUNNY kill-shots that sound like a savage real person talking shit out loud.
 
-The target reaction is: laugh first, then "god damn."
+The target reaction is: laugh, yell "GOD DAMN," then read it again.
 
-STYLE:
+VOICE:
 - ruthless
-- aggressive
+- unforgiving
 - blunt
-- conversational
+- slangy
+- casual
 - dirty when useful
-- offensive adult humor is allowed
-- quick jab, not a speech
-- every line should feel like it came from a live roast table
+- street-level conversational English
+- rough grammar is fine when it sounds natural
+- contractions are preferred
+- sentence fragments are allowed
+- sound like somebody clowning a friend, not somebody writing an essay
+
+Use slang naturally when it fits: bro, man, dawg, ain't, got, tryna, lookin', talkin', built like,
+hell nah, damn, shit, ass, bullshit. Do NOT force the same slang into every roast.
+
+Do NOT sound educated, literary, academic, corporate, therapeutic, or polished.
+Avoid fancy words when a simpler meaner word works.
+Avoid words like appears, suggests, resembles, possesses, demonstrates, demeanor, behavior,
+fundamentally, objectively, statistically, intellectually, cognitive, or sophisticated phrasing.
 
 THE GOLD STANDARD:
-A strong roast has a setup and then a turn that makes the second half hit harder.
+A strong roast hits fast, then turns the knife.
 Example of the LEVEL OF COMPRESSION AND PUNCH, not wording to copy:
 "Your barber didn't fuck up. He got even."
 
-Do NOT imitate that exact structure repeatedly. Learn the principle: short setup, brutal turn, stop.
+Do NOT copy that joke, barber topic, or exact grammar repeatedly.
+Learn the principle: quick setup, savage turn, stop.
 
 NEVER write fake-smart AI insults. Never write quirky filler just to sound creative.
 Avoid "energy of," "confidence of," "human equivalent," "argues with," "argues like," tech metaphors,
@@ -113,24 +125,26 @@ IQ jokes, NPC jokes, corporate jargon, therapy-speak, academic vocabulary, and r
 Allowed roast territory includes appearance, hair, clothes, sex/dating, relationships, money, jobs, hygiene,
 laziness, bad decisions, social behavior, family disappointment, ego, awkwardness, and embarrassing fictional backstory.
 
-Profanity is allowed when it sharpens the punch. Do not use profanity as filler.
+Be mean. Do not soften the insult. Do not sneak in a compliment. Do not explain the joke.
+Profanity is allowed when it sharpens the hit. Do not use profanity as filler.
 
 Hard boundaries: no racial or ethnic slurs, no attacks on protected traits, no genuine threats,
 no self-harm encouragement, and no presenting serious criminal accusations as real facts.
 
-One line. One kill-shot. Make it hurt AND make it funny.
+One line. One kill-shot. Make it sound like somebody said it while laughing in the target's face.
 """
 
 
 COMEDY_JUDGE_PROMPT = """
-You are the merciless head writer at a savage adult roast show.
+You are the merciless head writer at a filthy adult roast show.
 
-Your job is to reject weak jokes and keep only something that would make a room react with:
-"OH GOD DAMN" followed by laughter.
+Your job is to reject weak material and keep only something that makes the room yell:
+"OH GOD DAMN" and laugh.
 
-A line FAILS if it is merely:
-- clever wording
-- a random comparison
+A line FAILS if it is:
+- polished or writerly
+- fake-smart
+- a random comparison with no turn
 - a generic insult
 - an "X energy" joke
 - an "X confidence" joke
@@ -141,36 +155,40 @@ A line FAILS if it is merely:
 - verbose
 - polite
 - safe but boring
+- something that sounds like an English teacher wrote it
 
 A line PASSES when:
 - it sounds spoken, not written
-- it is aggressive immediately
+- it is savage immediately
+- it uses simple everyday words
+- slang or rough grammar feels natural
 - the ending changes or escalates the setup
 - it paints a humiliating picture fast
 - it has a real punchline, not just an insult
-- it feels like a comic found a weak spot and stabbed it
+- it feels like somebody found a weak spot and stomped on it
 - it is short enough to remember after hearing it once
 
 You may completely rewrite every candidate if they all suck.
-Do not protect the writer's feelings. Kill mediocre material.
+Do not protect anybody's feelings. Kill mediocre material.
 
 Final output rules:
 - exactly one roast
 - one sentence OR two ultra-short clauses in one line
-- preferably 5-11 words
+- preferably 4-10 words
 - absolute maximum 14 words
+- slang is welcome but not mandatory
 - profanity optional
 - no label, score, quote marks, explanation, or alternatives
 """
 
 
 FALLBACK_ROASTS = [
-    "{name}, your barber didn't miss. He retaliated.",
-    "{name}, your ex didn't leave. She escaped.",
-    "{name}, even your mirror looks away first.",
-    "{name}, your family group chat has a separate one without you.",
-    "{name}, your outfit looks like rent was due yesterday.",
-    "{name}, you look like apologies follow you professionally.",
+    "{name}, your barber ain't bad. He just hates you.",
+    "{name}, bro, even your mirror be judging you.",
+    "{name}, your ex ain't bitter. She survived you.",
+    "{name}, dawg, your whole fit look court-appointed.",
+    "{name}, you built like somebody's last damn option.",
+    "{name}, your own family probably mute you on purpose.",
 ]
 
 
@@ -666,6 +684,16 @@ FORBIDDEN_ROAST_PATTERNS = [
     'you look like a man who',
     'you look like someone who',
     'your brain',
+    'appears to',
+    'appearance suggests',
+    'resembles',
+    'possesses',
+    'demonstrates',
+    'demeanor',
+    'cognitive',
+    'fundamentally',
+    'objectively',
+    'statistically',
     'buffering',
     'loading screen',
     'software',
@@ -803,25 +831,39 @@ TARGET: {target_name}
 
 Write exactly 12 savage adult roast-battle kill-shots for this target.
 
-Do NOT polish one premise twelve ways. Use twelve genuinely different attacks.
-Every candidate must contain an actual punchline or turn.
+VOICE CHECK:
+These should sound like real people talking shit in a group chat, bar, roast battle, or backyard.
+Use simple words, rough rhythm, contractions, slang, and fragments when natural.
+Do NOT sound educated or polished.
+Do NOT write like a clever essay writer.
 
-Think like a ruthless comic trying to get the loudest reaction in the room.
+Good voice can include things like bro, man, dawg, ain't, got, lookin', built like, hell nah, damn, shit,
+ass, or bullshit — but don't force slang into every line and don't repeat the same slang constantly.
+
+Write twelve genuinely different attacks. Do NOT polish one premise twelve ways.
+Every candidate needs an actual punchline or turn.
+
+Think like a ruthless friend trying to get the loudest reaction in the room.
 The desired reaction is "OH GOD DAMN" and then laughter.
 
 Good material can hit appearance, hair, clothes, sex/dating, relationships, money, work, hygiene,
 bad decisions, ego, laziness, awkward behavior, family disappointment, or an absurd embarrassing backstory.
 
 Be offensive when it makes the joke funnier. Be direct. Be cruel in a comic way.
-Do not be polite, wholesome, inspirational, literary, or clever for its own sake.
+Do not soften it, compliment the target, explain the joke, or try to sound intelligent.
 
-BANNED FORMULAS:
+BANNED FORMULAS AND VOICE:
 - "energy of"
 - "confidence of"
 - "argues with"
 - "argues like"
 - "human equivalent"
 - "gives off"
+- "appears to"
+- "resembles"
+- "possesses"
+- "demonstrates"
+- fancy academic/corporate language
 - brain/CPU/buffering/software/NPC/Wi-Fi jokes
 - random "you look like [occupation]" lines with no second beat
 
@@ -829,14 +871,13 @@ The benchmark is compression plus a brutal turn, like the PRINCIPLE behind:
 "Your barber didn't fuck up. He got even."
 Do NOT copy that joke, barber topic, or exact grammar. Find your own kill-shots.
 
-RECENT ROASTS — DO NOT REUSE THEIR OPENINGS, PREMISES, IMAGERY, OR PUNCHLINES:
+RECENT ROASTS — DO NOT REUSE THEIR OPENINGS, PREMISES, IMAGERY, SLANG PATTERN, OR PUNCHLINES:
 {recent_text}
 
 Candidate length: roughly 4-14 words each.
 Return ONLY valid JSON:
 {{"candidates":["joke 1","joke 2","joke 3","joke 4","joke 5","joke 6","joke 7","joke 8","joke 9","joke 10","joke 11","joke 12"]}}
 """
-
     response = gemini_client.models.generate_content(
         model=GEMINI_MODEL,
         contents=prompt,
@@ -877,31 +918,36 @@ ROAST CANDIDATES:
 RECENT ROASTS TO AVOID:
 {recent_text}
 
-Act like the head writer five minutes before a live roast.
-Most submitted lines are garbage. Be ruthless.
+Act like the head writer five minutes before a savage live roast.
+Most submitted lines are trash. Be ruthless.
 
-Silently throw away anything that sounds generated, cute, quirky, safe, repetitive, or merely clever.
-A weird comparison is NOT enough. A mean statement is NOT enough. It needs a turn that earns the laugh.
+Silently kill anything that sounds generated, polished, cute, quirky, safe, repetitive, academic,
+or merely clever. A weird comparison is NOT enough. A mean statement is NOT enough.
+It needs a turn that earns the laugh.
 
 Pick the premise with the biggest "OH GOD DAMN" potential and rewrite it aggressively if necessary.
 If every candidate sucks, write a completely new roast instead.
 
-The final line should feel like a quick verbal punch to the mouth:
-setup -> turn -> stop.
+VOICE:
+Make it sound like somebody talking shit out loud, not writing.
+Simple words beat fancy words.
+Slang, contractions, fragments, and rough grammar are welcome when natural.
+Do not force "bro" or "dawg" into every joke.
+Do not sound smart. Sound funny and mean.
 
 Allowed: vulgarity, sex jokes, appearance jokes, relationship jokes, money/job jokes, family jokes,
 embarrassing fictional backstory, humiliation, and dark adult roast humor.
 
 Do not use any of these formulas:
-"energy of", "confidence of", "argues with", "argues like", "human equivalent", "gives off".
+"energy of", "confidence of", "argues with", "argues like", "human equivalent", "gives off",
+"appears to", "resembles", "possesses", "demonstrates".
 No tech metaphors. No IQ filler. No AI vocabulary.
 
-Make the END hit harder than the beginning.
-Prefer 5-11 words. Never exceed 14.
+Hit fast. Turn the knife. Stop.
+Prefer 4-10 words. Never exceed 14.
 One sentence, or two ultra-short clauses on one line.
 Return ONLY the finished roast.
 """
-
     response = gemini_client.models.generate_content(
         model=GEMINI_MODEL,
         contents=prompt,
@@ -925,20 +971,24 @@ def repair_roast(target_name, roast, recent_roasts):
 This attempted roast is not good enough:
 {roast}
 
-Rewrite it as a savage, quick adult roast-battle kill-shot.
+Rewrite it as a savage, quick, slangy adult roast-battle kill-shot.
 Do not preserve wording just because it exists.
 If the premise is weak, replace the premise entirely.
 
-It must have a brutal turn and a real punchline.
-No "energy of," "confidence of," "argues with," "argues like," tech, IQ, or AI-style phrasing.
+It must sound SPOKEN, not written.
+Use simple everyday words. Rough grammar or slang is fine when it sounds natural.
+Make it meaner, less polished, and more direct.
+It needs a brutal turn and a real punchline.
+
+No "energy of," "confidence of," "argues with," "argues like," "appears to," "resembles,"
+tech, IQ, corporate, academic, or AI-style phrasing.
 
 Recent material to avoid:
 {recent_text}
 
-Prefer 5-11 words. 14 maximum.
+Prefer 4-10 words. 14 maximum.
 Return ONLY the roast.
 """
-
     response = gemini_client.models.generate_content(
         model=GEMINI_MODEL,
         contents=prompt,
@@ -2296,7 +2346,7 @@ async def on_ready():
     )
 
     print(
-        'SAVAGE JABS EDITION'
+        'NO MERCY STREET ROAST EDITION'
     )
 
     print(
@@ -3339,7 +3389,7 @@ if __name__ == '__main__':
     print()
 
     print(
-        'Starting Nukem RoastBot 4.6.6...'
+        'Starting Nukem RoastBot 4.6.7...'
     )
 
     print()
